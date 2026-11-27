@@ -2,19 +2,27 @@ import { useMemo, useState } from 'react';
 import type { I18nDict } from '../data/i18n';
 import { formatMoney } from '../engines/freight';
 import { filterWaybills, triggerCsvDownload } from '../engines/waybillEngine';
-import type { Currency, Lang, WaybillRecord } from '../types/logistics';
+import type {
+  Currency,
+  Lang,
+  PrintDocTab,
+  WaybillRecord,
+} from '../types/logistics';
 import {
+  ArrowRightIcon,
   CheckCircleIcon,
   ClockIcon,
   ContainerIcon,
   DownloadIcon,
   DropletIcon,
+  FileTextIcon,
   PlaneIcon,
   PrinterIcon,
   SearchIcon,
   ShieldCheckIcon,
   ShipIcon,
   ThermometerIcon,
+  TrashIcon,
 } from './Icons';
 
 interface WaybillTrackerSectionProps {
@@ -24,7 +32,9 @@ interface WaybillTrackerSectionProps {
   waybills: WaybillRecord[];
   activeWaybillId: string;
   onSelectWaybill: (id: string) => void;
-  onPreviewBl: (waybill: WaybillRecord) => void;
+  onPreviewDoc: (waybill: WaybillRecord, tab: PrintDocTab) => void;
+  onAdvanceStage: (waybillId: string) => void;
+  onDeleteUserWaybill: (waybillId: string) => void;
 }
 
 export function WaybillTrackerSection({
@@ -34,7 +44,9 @@ export function WaybillTrackerSection({
   waybills,
   activeWaybillId,
   onSelectWaybill,
-  onPreviewBl,
+  onPreviewDoc,
+  onAdvanceStage,
+  onDeleteUserWaybill,
 }: WaybillTrackerSectionProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -78,15 +90,23 @@ export function WaybillTrackerSection({
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={handleExportAllCsv}
-            data-testid="export-all-csv"
-            className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-panel)] px-4 py-2.5 text-xs font-semibold text-[var(--text)] transition-colors hover:border-[var(--accent-emerald)] hover:text-[var(--accent-emerald)]"
-          >
-            <DownloadIcon className="h-4 w-4" />
-            <span>{t.exportAllCsv}</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-mono-tech inline-flex items-center gap-1.5 rounded-lg border border-[var(--accent-emerald)]/35 bg-[var(--accent-emerald-soft)] px-3 py-2 text-[11px] font-bold text-[var(--accent-emerald)]">
+              <ShieldCheckIcon className="h-3.5 w-3.5" />
+              <span>
+                {t.vaultSyncedBadge} · {waybills.length}
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={handleExportAllCsv}
+              data-testid="export-all-csv"
+              className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-panel)] px-4 py-2 text-xs font-semibold text-[var(--text)] transition-colors hover:border-[var(--accent-emerald)] hover:text-[var(--accent-emerald)]"
+            >
+              <DownloadIcon className="h-4 w-4" />
+              <span>{t.exportAllCsv}</span>
+            </button>
+          </div>
         </div>
 
         {/* Search Input */}
@@ -206,6 +226,17 @@ export function WaybillTrackerSection({
                   </div>
 
                   <div className="flex flex-wrap gap-2">
+                    {activeWaybill.currentStage < 6 && (
+                      <button
+                        type="button"
+                        onClick={() => onAdvanceStage(activeWaybill.id)}
+                        data-testid="advance-stage-btn"
+                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--accent-emerald)]/45 bg-[var(--accent-emerald-soft)] px-3 py-2 text-xs font-bold text-[var(--accent-emerald)] hover:opacity-90"
+                      >
+                        <span>{t.advanceStageBtn}</span>
+                        <ArrowRightIcon className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => handleExportSingleCsv(activeWaybill)}
@@ -217,13 +248,42 @@ export function WaybillTrackerSection({
                     </button>
                     <button
                       type="button"
-                      onClick={() => onPreviewBl(activeWaybill)}
+                      onClick={() => onPreviewDoc(activeWaybill, 'bl')}
                       data-testid="open-bl-preview"
-                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-[var(--accent-cyan)] px-3.5 py-2 text-xs font-bold text-white hover:opacity-90"
+                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-[var(--accent-cyan)] px-3 py-2 text-xs font-bold text-white hover:opacity-90"
                     >
                       <PrinterIcon className="h-3.5 w-3.5" />
                       <span>{t.previewPrintBl}</span>
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => onPreviewDoc(activeWaybill, 'invoice')}
+                      data-testid="open-invoice-preview"
+                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--accent-amber)]/45 bg-[var(--accent-amber-soft)] px-3 py-2 text-xs font-bold text-[var(--accent-amber)] hover:opacity-90"
+                    >
+                      <FileTextIcon className="h-3.5 w-3.5" />
+                      <span>{t.previewCommercialInvoice}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onPreviewDoc(activeWaybill, 'packing')}
+                      data-testid="open-packing-preview"
+                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-elevated)] px-3 py-2 text-xs font-semibold text-[var(--text)] hover:border-[var(--accent-cyan)]"
+                    >
+                      <FileTextIcon className="h-3.5 w-3.5" />
+                      <span>{t.previewPackingList}</span>
+                    </button>
+                    {activeWaybill.isUserBooked && (
+                      <button
+                        type="button"
+                        onClick={() => onDeleteUserWaybill(activeWaybill.id)}
+                        data-testid="delete-vault-waybill"
+                        className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-[var(--accent-rose)]/40 bg-[var(--accent-rose-soft)] px-2.5 py-2 text-xs font-bold text-[var(--accent-rose)] hover:opacity-90"
+                      >
+                        <TrashIcon className="h-3.5 w-3.5" />
+                        <span>{t.deleteVaultBtn}</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 

@@ -11,6 +11,7 @@ interface NavbarProps {
   setCurrency: (currency: Currency) => void;
   theme: Theme;
   setTheme: (theme: Theme) => void;
+  openAlertsCount: number;
 }
 
 export function Navbar({
@@ -21,6 +22,7 @@ export function Navbar({
   setCurrency,
   theme,
   setTheme,
+  openAlertsCount,
 }: NavbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [utcTime, setUtcTime] = useState(() =>
@@ -36,9 +38,11 @@ export function Navbar({
 
   const navLinks = [
     { href: '#control-map', label: t.navMap },
+    { href: '#container-optimizer', label: t.navContainer },
+    { href: '#customs-duty', label: t.navCustoms },
     { href: '#quote-engine', label: t.navQuote },
     { href: '#waybill-tracker', label: t.navTracker },
-    { href: '#port-intel', label: t.navPorts },
+    { href: '#control-alerts', label: t.navAlerts, badge: openAlertsCount },
   ];
 
   return (
@@ -47,14 +51,14 @@ export function Navbar({
         {/* Brand */}
         <a
           href="#control-map"
-          className="flex min-w-0 items-center gap-2.5 focus:outline-none"
+          className="flex shrink-0 items-center gap-2.5 focus:outline-none"
         >
           <MeridianLogo className="h-9 w-9 shrink-0" />
-          <div className="min-w-0 leading-none">
-            <div className="text-base font-extrabold tracking-tight text-[var(--text)]">
+          <div className="leading-none">
+            <div className="whitespace-nowrap text-base font-extrabold tracking-tight text-[var(--text)]">
               {t.brand}
             </div>
-            <div className="mt-0.5 truncate text-[9px] font-semibold tracking-[0.06em] text-[var(--accent-cyan)] sm:text-[10px] sm:tracking-[0.12em]">
+            <div className="mt-0.5 whitespace-nowrap text-[9px] font-semibold tracking-[0.06em] text-[var(--accent-cyan)] sm:text-[10px] sm:tracking-[0.12em]">
               {t.brandSub}
             </div>
           </div>
@@ -63,15 +67,20 @@ export function Navbar({
         {/* Desktop Nav */}
         <nav
           aria-label="Primary"
-          className="hidden items-center gap-1 lg:flex"
+          className="hidden items-center gap-0.5 lg:flex"
         >
           {navLinks.map((item) => (
             <a
               key={item.href}
               href={item.href}
-              className="rounded-md px-3 py-1.5 text-sm font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--text)]"
+              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-semibold text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--text)] xl:text-[13px]"
             >
-              {item.label}
+              <span>{item.label}</span>
+              {'badge' in item && item.badge !== undefined && item.badge > 0 && (
+                <span className="font-mono-tech inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[var(--accent-rose)] px-1 text-[10px] font-bold text-white">
+                  {item.badge}
+                </span>
+              )}
             </a>
           ))}
         </nav>
@@ -79,7 +88,7 @@ export function Navbar({
         {/* Right Controls */}
         <div className="flex shrink-0 items-center gap-2">
           {/* Live UTC Clock */}
-          <div className="font-mono-tech hidden items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] px-2.5 py-1 text-xs text-[var(--text-muted)] xl:flex">
+          <div className="font-mono-tech hidden items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] px-2.5 py-1 text-xs text-[var(--text-muted)] 2xl:flex">
             <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent-emerald)]" />
             <span>UTC {utcTime}</span>
           </div>

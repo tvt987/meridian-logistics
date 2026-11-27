@@ -22,6 +22,8 @@ interface ControlTowerHeroProps {
   t: I18nDict;
   lang: Lang;
   selectedCorridorId: string;
+  openAlertsCount: number;
+  criticalAlertsCount: number;
   onSelectCorridor: (corridorId: string) => void;
   onLoadCorridorToQuote: (corridor: ShippingCorridor) => void;
 }
@@ -55,6 +57,8 @@ export function ControlTowerHero({
   t,
   lang,
   selectedCorridorId,
+  openAlertsCount,
+  criticalAlertsCount,
   onSelectCorridor,
   onLoadCorridorToQuote,
 }: ControlTowerHeroProps) {
@@ -140,22 +144,60 @@ export function ControlTowerHero({
 
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:col-span-5">
             {[
-              { label: t.kpiVessels, value: '18', tone: 'text-[var(--accent-cyan)]' },
-              { label: t.kpiTeu, value: '4,280', tone: 'text-[var(--text)]' },
-              { label: t.kpiCustoms, value: '3.4h', tone: 'text-[var(--accent-amber)]' },
-              { label: t.kpiReefer, value: '99.8%', tone: 'text-[var(--accent-emerald)]' },
+              {
+                label: t.kpiVessels,
+                value: '18',
+                pill: null as string | null,
+                tone: 'text-[var(--accent-cyan)]',
+                href: '#port-intel',
+              },
+              {
+                label: t.kpiTeu,
+                value: '4,280',
+                pill: null as string | null,
+                tone: 'text-[var(--text)]',
+                href: '#container-optimizer',
+              },
+              {
+                label: t.kpiCustoms,
+                value: '3.4h',
+                pill: null as string | null,
+                tone: 'text-[var(--accent-emerald)]',
+                href: '#customs-duty',
+              },
+              {
+                label: t.kpiAlerts,
+                value: String(openAlertsCount),
+                pill:
+                  criticalAlertsCount > 0
+                    ? `${criticalAlertsCount} CRIT`
+                    : null,
+                tone:
+                  criticalAlertsCount > 0
+                    ? 'text-[var(--accent-rose)]'
+                    : 'text-[var(--accent-emerald)]',
+                href: '#control-alerts',
+              },
             ].map((kpi) => (
-              <div
+              <a
                 key={kpi.label}
-                className="panel-card rounded-lg px-3 py-2"
+                href={kpi.href}
+                className="panel-card rounded-lg px-3 py-2 transition-colors hover:border-[var(--border-strong)]"
               >
-                <div className={`font-mono-tech text-lg font-bold ${kpi.tone}`}>
-                  {kpi.value}
+                <div className="flex items-center justify-between gap-1">
+                  <span className={`font-mono-tech text-lg font-bold ${kpi.tone}`}>
+                    {kpi.value}
+                  </span>
+                  {kpi.pill && (
+                    <span className="font-mono-tech shrink-0 rounded border border-[var(--accent-rose)]/35 bg-[var(--accent-rose-soft)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--accent-rose)]">
+                      {kpi.pill}
+                    </span>
+                  )}
                 </div>
                 <div className="mt-0.5 text-[11px] font-medium leading-tight text-[var(--text-muted)]">
                   {kpi.label}
                 </div>
-              </div>
+              </a>
             ))}
           </div>
         </div>

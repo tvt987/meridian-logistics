@@ -25,7 +25,7 @@ export function computeCrc16Ccitt(payload: string): string {
 }
 
 /**
- * Generates an authentic NAPAS 247 / VietQR EMVCo payload for Techcombank (970407 / 19077742964012).
+ * Generates an authentic NAPAS 247 / VietQR EMVCo payload for MBBank (970422 / 0325456574 / TRUONG VAN TINH).
  */
 export function buildVietQrPayload(amountVnd: number, memo: string): string {
   const cleanMemo = memo

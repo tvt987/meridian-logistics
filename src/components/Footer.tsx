@@ -36,7 +36,7 @@ export function Footer({ t }: FooterProps) {
               <li>Saigon Maritime Tower, Dist. 1, Ho Chi Minh City, Vietnam</li>
               <li className="font-mono-tech">Ops Desk: tinhkun102@gmail.com</li>
               <li className="font-mono-tech">
-                Settlement: {VIETQR_CONFIG.bankName} · {VIETQR_CONFIG.accountNumber}
+                Settlement: {VIETQR_CONFIG.bankName} ({VIETQR_CONFIG.bankBin}) · {VIETQR_CONFIG.accountNumber} · {VIETQR_CONFIG.accountHolder}
               </li>
             </ul>
           </div>

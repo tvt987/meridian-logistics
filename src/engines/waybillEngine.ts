@@ -308,3 +308,54 @@ export function triggerCsvDownload(
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
+
+/**
+ * Advances a shipment to the next customs/transit stage (up to stage 6) and updates timestamps.
+ */
+export function advanceWaybillStage(
+  records: WaybillRecord[],
+  waybillId: string,
+  nowDate: Date = new Date(),
+): WaybillRecord[] {
+  const stamp = `${nowDate.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+  return records.map((wb) => {
+    if (wb.id !== waybillId) return wb;
+    if (wb.currentStage >= 6) return wb;
+    const nextStage = Math.min(6, wb.currentStage + 1);
+    const updatedStages = wb.stages.map((st) => {
+      if (st.step < nextStage) {
+        return {
+          ...st,
+          status: 'completed' as const,
+          timestamp:
+            st.step === wb.currentStage && st.status === 'active'
+              ? stamp
+              : st.timestamp,
+        };
+      }
+      if (st.step === nextStage) {
+        return {
+          ...st,
+          status: nextStage === 6 ? ('completed' as const) : ('active' as const),
+          timestamp: stamp,
+        };
+      }
+      return { ...st, status: 'pending' as const };
+    });
+    return {
+      ...wb,
+      currentStage: nextStage,
+      stages: updatedStages,
+    };
+  });
+}
+
+/**
+ * Deletes a user-created booked waybill from the localStorage Shipment Vault (protects preloaded enterprise records).
+ */
+export function deleteUserWaybill(
+  records: WaybillRecord[],
+  waybillId: string,
+): WaybillRecord[] {
+  return records.filter((wb) => !(wb.id === waybillId && wb.isUserBooked));
+}

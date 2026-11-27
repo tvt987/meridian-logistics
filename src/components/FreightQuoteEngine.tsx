@@ -672,7 +672,7 @@ export function FreightQuoteEngine({
               <div className="mt-3 flex items-center justify-center gap-2 text-[11px] text-[var(--text-muted)]">
                 <ShieldCheckIcon className="h-3.5 w-3.5 text-[var(--accent-emerald)]" />
                 <span>
-                  Techcombank VietQR · Instant Waybill + A4 Bill of Lading
+                  MBBank VietQR ({VIETQR_CONFIG.accountNumber}) · Waybill + A4 Invoice &amp; Packing List
                 </span>
               </div>
             </div>
@@ -680,7 +680,7 @@ export function FreightQuoteEngine({
         </div>
       </div>
 
-      {/* Booking & Techcombank VietQR Modal */}
+      {/* Booking & MBBank VietQR Modal */}
       {modalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
@@ -889,13 +889,13 @@ export function FreightQuoteEngine({
                   </div>
                 </div>
 
-                {/* Techcombank VietQR Box */}
+                {/* MBBank VietQR Box */}
                 <div className="grid grid-cols-1 gap-5 rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:grid-cols-12 sm:items-center">
                   <div className="flex flex-col items-center sm:col-span-5">
                     <QrSvg
                       value={vietQrPayload}
                       sizePx={172}
-                      label={`Techcombank VietQR for ${bookedWaybill.id}`}
+                      label={`MBBank VietQR for ${bookedWaybill.id}`}
                     />
                     <span className="font-mono-tech mt-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent-amber)]">
                       NAPAS 247 · BIN {VIETQR_CONFIG.bankBin}

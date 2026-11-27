@@ -267,15 +267,19 @@ describe('Incoterms 2020, Insurance, Reefer & Currency Math', () => {
   });
 });
 
-describe('Techcombank VietQR EMVCo & Offline QR Matrix (src/engines/vietQr.ts)', () => {
+describe('MBBank VietQR EMVCo & Offline QR Matrix (src/engines/vietQr.ts)', () => {
   it('computes known standard CRC-16/CCITT-FALSE check value (0x29B1 for "123456789")', () => {
     expect(computeCrc16Ccitt('123456789')).toBe('29B1');
   });
 
-  it('encodes Techcombank BIN 970407, account 19077742964012, VND 704 and valid CRC', () => {
+  it('encodes MBBank BIN 970422, account 0325456574, holder TRUONG VAN TINH, VND 704 and valid CRC', () => {
+    expect(VIETQR_CONFIG.bankName).toBe('MBBank');
+    expect(VIETQR_CONFIG.bankBin).toBe('970422');
+    expect(VIETQR_CONFIG.accountNumber).toBe('0325456574');
+    expect(VIETQR_CONFIG.accountHolder).toBe('TRUONG VAN TINH');
     const payload = buildVietQrPayload(12500000, 'MRD-88412 MERIDIAN');
-    expect(payload).toContain('970407');
-    expect(payload).toContain('19077742964012');
+    expect(payload).toContain('970422');
+    expect(payload).toContain('0325456574');
     expect(payload).toContain('A000000727');
     expect(payload).toContain('5303704');
     expect(payload).toContain('540812500000');

@@ -1,12 +1,12 @@
 {
   "name": "meridian-logistics",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview --port 4337 --strictPort",
+    "preview": "vite preview --port 4365 --strictPort",
     "test": "vitest run",
     "test:watch": "vitest"
   },

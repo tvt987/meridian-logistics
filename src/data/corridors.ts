@@ -3,9 +3,9 @@ import type { CargoPreset, PortHub, ShippingCorridor } from '../types/logistics'
 export const FX_USD_TO_VND = 25450;
 
 export const VIETQR_CONFIG = {
-  bankName: 'Techcombank',
-  bankBin: '970407',
-  accountNumber: '19077742964012',
+  bankName: 'MBBank',
+  bankBin: '970422',
+  accountNumber: '0325456574',
   accountHolder: 'TRUONG VAN TINH',
   depositRatio: 0.2,
 } as const;

@@ -191,3 +191,202 @@ export interface BookingCustomerForm {
   commodity: string;
   hsCode: string;
 }
+
+/* ============================================================================
+ * v2.0 VIP PRO TYPES — Container Stuffing, Vietnam Customs/FTA, Alerts, A4 Docs
+ * ============================================================================ */
+
+export type ContainerTypeId = '20ft-std' | '40ft-std' | '40ft-hc' | '40ft-reefer';
+
+export interface ContainerSpec {
+  id: ContainerTypeId;
+  code: string;
+  nameEn: string;
+  nameVi: string;
+  innerLengthCm: number;
+  innerWidthCm: number;
+  innerHeightCm: number;
+  maxPayloadKg: number;
+  tareWeightKg: number;
+  internalVolumeCbm: number;
+  isReefer: boolean;
+  linkedQuoteMode: TransportMode;
+}
+
+export interface CargoSkuItem {
+  id: string;
+  skuCode: string;
+  name: string;
+  lengthCm: number;
+  widthCm: number;
+  heightCm: number;
+  weightKg: number;
+  qty: number;
+  stackable: boolean;
+  color: string;
+}
+
+export interface PlacedCartonBox {
+  id: string;
+  containerIndex: number;
+  skuId: string;
+  skuCode: string;
+  skuName: string;
+  color: string;
+  x: number; // along container length (cm)
+  y: number; // along container width (cm)
+  z: number; // along container height (cm)
+  l: number; // placed length along X (cm)
+  w: number; // placed width along Y (cm)
+  h: number; // height along Z (cm)
+  weightKg: number;
+  stackable: boolean;
+}
+
+export interface SkuPackingSummary {
+  skuId: string;
+  skuCode: string;
+  name: string;
+  color: string;
+  requestedQty: number;
+  loadedQty: number;
+  unfitQty: number;
+  maxPerSingleContainer: number;
+  unitVolumeCbm: number;
+  totalVolumeCbm: number;
+  totalWeightKg: number;
+  volumeSharePct: number;
+  stackable: boolean;
+}
+
+export interface ContainerLoadBay {
+  index: number;
+  cartonCount: number;
+  usedVolumeCbm: number;
+  volumeUtilizationPct: number;
+  usedWeightKg: number;
+  payloadUtilizationPct: number;
+  centerOfGravityPct: number; // 0..100 along container length
+  placedBoxes: PlacedCartonBox[];
+}
+
+export interface ContainerPackingResult {
+  container: ContainerSpec;
+  containersRequired: number;
+  totalRequestedCartons: number;
+  totalLoadedCartons: number;
+  unfitCartons: number;
+  totalCargoVolumeCbm: number;
+  totalCargoWeightKg: number;
+  volumeUtilizationPct: number;
+  payloadUtilizationPct: number;
+  limitingFactor: 'volume' | 'payload' | 'dimensions';
+  centerOfGravityPct: number;
+  balanceStatus: 'balanced' | 'nose-heavy' | 'tail-heavy';
+  skuBreakdown: SkuPackingSummary[];
+  containers: ContainerLoadBay[];
+}
+
+export type FtaRegime = 'MFN' | 'EVFTA' | 'CPTPP' | 'ACFTA';
+
+export interface HsTariffPreset {
+  id: string;
+  hsCode: string;
+  categoryEn: string;
+  categoryVi: string;
+  descriptionEn: string;
+  descriptionVi: string;
+  mfnRatePct: number;
+  evftaRatePct: number;
+  cptppRatePct: number;
+  acftaRatePct: number;
+  defaultSctRatePct: number;
+  defaultVatRatePct: 8 | 10;
+  defaultFobUsd: number;
+  defaultFreightUsd: number;
+  defaultInsuranceUsd: number;
+  defaultUnits: number;
+  coNoteEn: string;
+  coNoteVi: string;
+}
+
+export interface CustomsDutyInput {
+  presetId: string;
+  customHsCode?: string;
+  regime: FtaRegime;
+  fobValueUsd: number;
+  freightUsd: number;
+  insuranceUsd: number;
+  unitQuantity: number;
+  vatRatePct: 8 | 10;
+  sctRatePct: number;
+  localClearanceFeesUsd: number;
+}
+
+export interface RegimeComparisonRow {
+  regime: FtaRegime;
+  certificateLabel: string;
+  dutyRatePct: number;
+  importDutyUsd: number;
+  sctUsd: number;
+  vatUsd: number;
+  totalTaxesUsd: number;
+  totalLandedCostUsd: number;
+  totalLandedCostVnd: number;
+  landedCostPerUnitUsd: number;
+  savingsVsMfnUsd: number;
+  savingsVsMfnVnd: number;
+}
+
+export interface CustomsDutyResult {
+  preset: HsTariffPreset;
+  hsCode: string;
+  regime: FtaRegime;
+  unitQuantity: number;
+  fobValueUsd: number;
+  freightUsd: number;
+  insuranceUsd: number;
+  cifValueUsd: number;
+  cifValueVnd: number;
+  appliedDutyRatePct: number;
+  sctRatePct: number;
+  vatRatePct: 8 | 10;
+  importDutyUsd: number;
+  sctUsd: number;
+  vatUsd: number;
+  totalTaxesUsd: number;
+  localClearanceFeesUsd: number;
+  totalLandedCostUsd: number;
+  totalLandedCostVnd: number;
+  landedCostPerUnitUsd: number;
+  landedCostPerUnitVnd: number;
+  effectiveTaxBurdenPct: number;
+  savingsVsMfnUsd: number;
+  savingsVsMfnVnd: number;
+  bestRegime: FtaRegime;
+  comparisons: RegimeComparisonRow[];
+}
+
+export type AlertSeverity = 'critical' | 'warning' | 'info';
+export type AlertStatus = 'open' | 'acknowledged' | 'resolved';
+
+export interface ExceptionAlert {
+  id: string;
+  waybillId: string;
+  corridorId: string;
+  portCode: string;
+  severity: AlertSeverity;
+  status: AlertStatus;
+  category: 'reefer' | 'congestion' | 'customs' | 'cutoff' | 'security';
+  titleEn: string;
+  titleVi: string;
+  detailEn: string;
+  detailVi: string;
+  actionEn: string;
+  actionVi: string;
+  slaMinutesRemaining: number;
+  detectedAt: string;
+  resolvedAt?: string;
+}
+
+export type PrintDocTab = 'bl' | 'invoice' | 'packing';
