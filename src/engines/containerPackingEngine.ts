@@ -6,6 +6,7 @@ import type {
   ContainerTypeId,
   PlacedCartonBox,
   SkuPackingSummary,
+  SolasViolationCode,
 } from '../types/logistics';
 
 export const CONTAINER_SPECS: Record<ContainerTypeId, ContainerSpec> = {
@@ -294,6 +295,8 @@ interface WorkingContainer {
   usedWeightKg: number;
   usedVolumeCm3: number;
   momentXKgCm: number;
+  momentYKgCm: number;
+  momentZKgCm: number;
   bays: ActiveBay[];
   placedBoxes: PlacedCartonBox[];
 }
@@ -305,6 +308,8 @@ function createWorkingContainer(index: number): WorkingContainer {
     usedWeightKg: 0,
     usedVolumeCm3: 0,
     momentXKgCm: 0,
+    momentYKgCm: 0,
+    momentZKgCm: 0,
     bays: [],
     placedBoxes: [],
   };
@@ -479,6 +484,8 @@ function recordBox(
   wc.usedWeightKg += sku.weightKg;
   wc.usedVolumeCm3 += l * w * h;
   wc.momentXKgCm += (x + l / 2) * sku.weightKg;
+  wc.momentYKgCm += (y + w / 2) * sku.weightKg;
+  wc.momentZKgCm += (z + h / 2) * sku.weightKg;
   wc.placedBoxes.push({
     id: `${sku.id}-${boxSeq}`,
     containerIndex: wc.index,
@@ -495,6 +502,57 @@ function recordBox(
     weightKg: sku.weightKg,
     stackable: sku.stackable,
   });
+}
+
+/**
+ * Evaluates IMO/ILO/UNECE CTU Code & SOLAS Chapter VI Regulation 2 (e-VGM)
+ * structural compliance for a loaded ISO container bay.
+ */
+export function evaluateSolasVgmCompliance(params: {
+  container: ContainerSpec;
+  usedWeightKg: number;
+  cgXPct: number;
+  cgYPct: number;
+  cgZPct: number;
+  cartonCount: number;
+  unfitCartons?: number;
+}): {
+  vgmGrossKg: number;
+  maxGrossSolasKg: number;
+  solasVgmCompliant: boolean;
+  solasViolations: SolasViolationCode[];
+} {
+  const { container, usedWeightKg, cgXPct, cgYPct, cgZPct, cartonCount } =
+    params;
+  const unfitCartons = params.unfitCartons ?? 0;
+  const vgmGrossKg = round2(container.tareWeightKg + usedWeightKg);
+  const maxGrossSolasKg = round2(container.tareWeightKg + container.maxPayloadKg);
+  const violations: SolasViolationCode[] = [];
+
+  if (usedWeightKg > container.maxPayloadKg + 1e-6) {
+    violations.push('OVERWEIGHT_PAYLOAD');
+  }
+  if (unfitCartons > 0) {
+    violations.push('OVERSIZE_CARGO');
+  }
+  if (cartonCount > 0) {
+    if (cgXPct < 36 || cgXPct > 64) {
+      violations.push('LONGITUDINAL_IMBALANCE');
+    }
+    if (cgYPct < 38 || cgYPct > 62) {
+      violations.push('LATERAL_IMBALANCE');
+    }
+    if (cgZPct > 58) {
+      violations.push('HIGH_VERTICAL_CG');
+    }
+  }
+
+  return {
+    vgmGrossKg,
+    maxGrossSolasKg,
+    solasVgmCompliant: violations.length === 0,
+    solasViolations: violations,
+  };
 }
 
 /**
@@ -571,7 +629,14 @@ export function optimizeContainerLoad(
   const containerInternalCm3 =
     container.innerLengthCm * container.innerWidthCm * container.innerHeightCm;
 
-  const containers: ContainerLoadBay[] = workingContainers.map((wc) => {
+  const totalRequestedCartons = sanitizedSkus.reduce((acc, s) => acc + s.qty, 0);
+  const totalLoadedRaw = workingContainers.reduce(
+    (acc, wc) => acc + wc.placedBoxes.length,
+    0,
+  );
+  const unfitCartons = totalRequestedCartons - totalLoadedRaw;
+
+  const containers: ContainerLoadBay[] = workingContainers.map((wc, idx) => {
     const usedVolumeCbm = round3(wc.usedVolumeCm3 / 1_000_000);
     const usedWeightKg = round2(wc.usedWeightKg);
     const volumeUtilizationPct = Math.min(
@@ -582,12 +647,40 @@ export function optimizeContainerLoad(
       100,
       round1((usedWeightKg / container.maxPayloadKg) * 100),
     );
-    const centerOfGravityPct =
+    const cgXPct =
       usedWeightKg > 0
         ? round1(
             (wc.momentXKgCm / (usedWeightKg * container.innerLengthCm)) * 100,
           )
         : 50;
+    const cgYPct =
+      usedWeightKg > 0
+        ? round1(
+            (wc.momentYKgCm / (usedWeightKg * container.innerWidthCm)) * 100,
+          )
+        : 50;
+    const cgZPct =
+      usedWeightKg > 0
+        ? round1(
+            (wc.momentZKgCm / (usedWeightKg * container.innerHeightCm)) * 100,
+          )
+        : 0;
+
+    // Statically determinate beam reaction along container length (X=0 kingpin/front, X=L rear tandem)
+    const rearAxleSharePct = usedWeightKg > 0 ? cgXPct : 50;
+    const frontAxleSharePct = round1(100 - rearAxleSharePct);
+    const rightSideSharePct = usedWeightKg > 0 ? cgYPct : 50;
+    const leftSideSharePct = round1(100 - rightSideSharePct);
+
+    const solasAudit = evaluateSolasVgmCompliance({
+      container,
+      usedWeightKg,
+      cgXPct,
+      cgYPct,
+      cgZPct,
+      cartonCount: wc.placedBoxes.length,
+      unfitCartons: idx === 0 ? unfitCartons : 0,
+    });
 
     return {
       index: wc.index,
@@ -596,17 +689,26 @@ export function optimizeContainerLoad(
       volumeUtilizationPct,
       usedWeightKg,
       payloadUtilizationPct,
-      centerOfGravityPct,
+      centerOfGravityPct: cgXPct,
+      cgXPct,
+      cgYPct,
+      cgZPct,
+      frontAxleSharePct,
+      rearAxleSharePct,
+      leftSideSharePct,
+      rightSideSharePct,
+      vgmGrossKg: solasAudit.vgmGrossKg,
+      maxGrossSolasKg: solasAudit.maxGrossSolasKg,
+      solasVgmCompliant: solasAudit.solasVgmCompliant,
+      solasViolations: solasAudit.solasViolations,
       placedBoxes: wc.placedBoxes,
     };
   });
 
-  const totalRequestedCartons = sanitizedSkus.reduce((acc, s) => acc + s.qty, 0);
   const totalLoadedCartons = containers.reduce(
     (acc, c) => acc + c.cartonCount,
     0,
   );
-  const unfitCartons = totalRequestedCartons - totalLoadedCartons;
   const totalCargoVolumeCbm = round3(
     containers.reduce((acc, c) => acc + c.usedVolumeCbm, 0),
   );
@@ -638,12 +740,19 @@ export function optimizeContainerLoad(
     limitingFactor = 'payload';
   }
 
-  const firstCog = containers[0]?.centerOfGravityPct ?? 50;
+  const firstBay = containers[0];
+  const firstCog = firstBay?.cgXPct ?? 50;
   let balanceStatus: ContainerPackingResult['balanceStatus'] = 'balanced';
   if (totalLoadedCartons > 0) {
     if (firstCog < 36) balanceStatus = 'nose-heavy';
     else if (firstCog > 64) balanceStatus = 'tail-heavy';
   }
+
+  const allViolations = Array.from(
+    new Set(containers.flatMap((c) => c.solasViolations)),
+  );
+  const allCompliant =
+    unfitCartons === 0 && containers.every((c) => c.solasVgmCompliant);
 
   const skuBreakdown: SkuPackingSummary[] = sanitizedSkus.map((sku) => {
     const loadedQty = loadedBySku.get(sku.id) ?? 0;
@@ -686,6 +795,17 @@ export function optimizeContainerLoad(
     payloadUtilizationPct,
     limitingFactor,
     centerOfGravityPct: firstCog,
+    cgXPct: firstBay?.cgXPct ?? 50,
+    cgYPct: firstBay?.cgYPct ?? 50,
+    cgZPct: firstBay?.cgZPct ?? 0,
+    frontAxleSharePct: firstBay?.frontAxleSharePct ?? 50,
+    rearAxleSharePct: firstBay?.rearAxleSharePct ?? 50,
+    vgmGrossKg: firstBay?.vgmGrossKg ?? container.tareWeightKg,
+    maxGrossSolasKg:
+      firstBay?.maxGrossSolasKg ??
+      container.tareWeightKg + container.maxPayloadKg,
+    solasVgmCompliant: allCompliant,
+    solasViolations: allViolations,
     balanceStatus,
     skuBreakdown,
     containers,

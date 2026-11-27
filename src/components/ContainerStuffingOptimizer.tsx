@@ -17,9 +17,12 @@ import {
   AlertTriangleIcon,
   ArrowRightIcon,
   BoxCubeIcon,
+  CheckCircleIcon,
   LayersIcon,
   PlusIcon,
   PrinterIcon,
+  ScaleIcon,
+  ShieldCheckIcon,
   TrashIcon,
 } from './Icons';
 
@@ -55,13 +58,19 @@ function IsoCargoBaySvg({
   container,
   boxes,
   highlightedSkuId,
-  cogPct,
+  cgXPct,
+  cgYPct,
+  cgZPct,
+  solasCompliant,
   onHoverSku,
 }: {
   container: ContainerSpec;
   boxes: PlacedCartonBox[];
   highlightedSkuId: string | null;
-  cogPct: number;
+  cgXPct: number;
+  cgYPct: number;
+  cgZPct: number;
+  solasCompliant: boolean;
   onHoverSku: (skuId: string | null) => void;
 }) {
   const L = container.innerLengthCm;
@@ -118,9 +127,14 @@ function IsoCargoBaySvg({
   const cLWH = p(L, W, H);
   const c0WH = p(0, W, H);
 
-  const cogX = (cogPct / 100) * L;
+  const cogX = (cgXPct / 100) * L;
+  const cogY = (cgYPct / 100) * W;
+  const cogZ = (cgZPct / 100) * H;
+  const cogFloorPt = p(cogX, cogY, 0);
+  const cog3dPt = p(cogX, cogY, cogZ);
   const cogStart = p(cogX, W, 0);
   const cogEnd = p(cogX, W + 24, 0);
+  const cogColor = solasCompliant ? '#10b981' : '#f43f5e';
 
   return (
     <svg
@@ -266,28 +280,50 @@ function IsoCargoBaySvg({
         <line x1={cL00[0]} y1={cL00[1]} x2={cL0H[0]} y2={cL0H[1]} />
       </g>
 
-      {/* Center of Gravity (CoG) Indicator */}
+      {/* 3D Center of Gravity (CG X/Y/Z) Crosshair & Datum */}
       {boxes.length > 0 && (
         <g>
+          {/* Vertical drop line from 3D mass centroid to container floor */}
+          <line
+            x1={cogFloorPt[0]}
+            y1={cogFloorPt[1]}
+            x2={cog3dPt[0]}
+            y2={cog3dPt[1]}
+            stroke={cogColor}
+            strokeWidth="1.6"
+            strokeDasharray="3 2"
+          />
+          <circle
+            cx={cog3dPt[0]}
+            cy={cog3dPt[1]}
+            r="6.5"
+            fill="var(--bg-map)"
+            fillOpacity="0.88"
+            stroke={cogColor}
+            strokeWidth="2"
+          />
+          <circle cx={cog3dPt[0]} cy={cog3dPt[1]} r="2.6" fill={cogColor} />
+
+          {/* Longitudinal datum pointer along container side rail */}
           <line
             x1={cogStart[0]}
             y1={cogStart[1]}
             x2={cogEnd[0]}
             y2={cogEnd[1]}
-            stroke="#f59e0b"
+            stroke={cogColor}
             strokeWidth="2"
           />
-          <circle cx={cogEnd[0]} cy={cogEnd[1]} r="4" fill="#f59e0b" />
+          <circle cx={cogEnd[0]} cy={cogEnd[1]} r="3.5" fill={cogColor} />
           <text
             x={cogEnd[0] - 6}
             y={cogEnd[1] + 14}
-            fill="#f59e0b"
+            fill={cogColor}
             fontSize="10"
             fontWeight="700"
             textAnchor="end"
             fontFamily="JetBrains Mono, monospace"
           >
-            CoG {cogPct}%
+            CG ({cgXPct}% / {cgYPct}% / {cgZPct}%)
           </text>
         </g>
       )}
@@ -318,14 +354,20 @@ function OrthographicBaySvg({
   container,
   boxes,
   highlightedSkuId,
-  cogPct,
+  cgXPct,
+  cgYPct,
+  cgZPct,
+  solasCompliant,
   onHoverSku,
 }: {
   mode: 'side' | 'top';
   container: ContainerSpec;
   boxes: PlacedCartonBox[];
   highlightedSkuId: string | null;
-  cogPct: number;
+  cgXPct: number;
+  cgYPct: number;
+  cgZPct: number;
+  solasCompliant: boolean;
   onHoverSku: (skuId: string | null) => void;
 }) {
   const L = container.innerLengthCm;
@@ -343,6 +385,12 @@ function OrthographicBaySvg({
   const drawH = secondary * scale;
   const ox = (vw - drawW) / 2;
   const oy = (vh - drawH) / 2;
+  const cogColor = solasCompliant ? '#10b981' : '#f43f5e';
+  const cogScreenX = ox + (cgXPct / 100) * drawW;
+  const cogScreenY =
+    mode === 'side'
+      ? oy + drawH - (cgZPct / 100) * drawH
+      : oy + (cgYPct / 100) * drawH;
 
   const visibleBoxes = useMemo(() => boxes.slice(0, 420), [boxes]);
 
@@ -368,6 +416,16 @@ function OrthographicBaySvg({
         stroke="var(--accent-cyan)"
         strokeWidth="1.6"
         rx="2"
+      />
+
+      {/* Safe CG envelope band (36% - 64% longitudinal) */}
+      <rect
+        x={ox + 0.36 * drawW}
+        y={oy}
+        width={0.28 * drawW}
+        height={drawH}
+        fill="#10b981"
+        fillOpacity="0.06"
       />
 
       {/* Grid Ticks */}
@@ -412,28 +470,49 @@ function OrthographicBaySvg({
         );
       })}
 
-      {/* Center of Gravity Datum */}
+      {/* 2D Projected Center of Gravity Crosshair */}
       {boxes.length > 0 && (
         <g>
           <line
-            x1={ox + (cogPct / 100) * drawW}
+            x1={cogScreenX}
             y1={oy - 10}
-            x2={ox + (cogPct / 100) * drawW}
+            x2={cogScreenX}
             y2={oy + drawH + 10}
-            stroke="#f59e0b"
+            stroke={cogColor}
             strokeWidth="1.8"
             strokeDasharray="4 3"
           />
+          <line
+            x1={ox - 6}
+            y1={cogScreenY}
+            x2={ox + drawW + 6}
+            y2={cogScreenY}
+            stroke={cogColor}
+            strokeWidth="1.2"
+            strokeDasharray="3 3"
+            opacity="0.75"
+          />
+          <circle
+            cx={cogScreenX}
+            cy={cogScreenY}
+            r="6"
+            fill="var(--bg-map)"
+            stroke={cogColor}
+            strokeWidth="2"
+          />
+          <circle cx={cogScreenX} cy={cogScreenY} r="2.4" fill={cogColor} />
           <text
-            x={ox + (cogPct / 100) * drawW}
+            x={cogScreenX}
             y={oy - 14}
-            fill="#f59e0b"
+            fill={cogColor}
             fontSize="10"
             fontWeight="700"
             textAnchor="middle"
             fontFamily="JetBrains Mono, monospace"
           >
-            CoG {cogPct}%
+            {mode === 'side'
+              ? `CG-X ${cgXPct}% · CG-Z ${cgZPct}%`
+              : `CG-X ${cgXPct}% · CG-Y ${cgYPct}%`}
           </text>
         </g>
       )}
@@ -839,6 +918,189 @@ export function ContainerStuffingOptimizer({
               </div>
             </div>
 
+            {/* 3D Center-of-Gravity (CG X/Y/Z %) & SOLAS e-VGM Axle Weight Balance Audit */}
+            {currentBay && (
+              <div
+                data-testid="cg-xyz-audit"
+                className="panel-card rounded-xl p-4"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] pb-3">
+                  <div className="flex items-center gap-2">
+                    <ScaleIcon className="h-4 w-4 text-[var(--accent-cyan)]" />
+                    <span className="text-xs font-bold text-[var(--text)]">
+                      {t.packerSolasTitle}
+                    </span>
+                    <span className="font-mono-tech text-[10px] text-[var(--text-dim)]">
+                      Bay #{currentBay.index + 1} · CTU Code / SOLAS Ch. VI
+                    </span>
+                  </div>
+
+                  <span
+                    data-testid="solas-vgm-badge"
+                    className={`font-mono-tech inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${
+                      currentBay.solasVgmCompliant
+                        ? 'border-[var(--accent-emerald)]/40 bg-[var(--accent-emerald-soft)] text-[var(--accent-emerald)]'
+                        : 'border-[var(--accent-rose)]/45 bg-[var(--accent-rose-soft)] text-[var(--accent-rose)]'
+                    }`}
+                  >
+                    {currentBay.solasVgmCompliant ? (
+                      <CheckCircleIcon className="h-3.5 w-3.5" />
+                    ) : (
+                      <AlertTriangleIcon className="h-3.5 w-3.5" />
+                    )}
+                    <span>
+                      {currentBay.solasVgmCompliant
+                        ? t.packerSolasPass
+                        : t.packerSolasFail}
+                    </span>
+                  </span>
+                </div>
+
+                {/* CG X / Y / Z Metrics */}
+                <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                  {[
+                    {
+                      id: 'cg-x',
+                      label: t.packerCgX,
+                      value: currentBay.cgXPct,
+                      band: '36–64%',
+                      ok: currentBay.cgXPct >= 36 && currentBay.cgXPct <= 64,
+                    },
+                    {
+                      id: 'cg-y',
+                      label: t.packerCgY,
+                      value: currentBay.cgYPct,
+                      band: '38–62%',
+                      ok: currentBay.cgYPct >= 38 && currentBay.cgYPct <= 62,
+                    },
+                    {
+                      id: 'cg-z',
+                      label: t.packerCgZ,
+                      value: currentBay.cgZPct,
+                      band: '≤58%',
+                      ok: currentBay.cgZPct <= 58,
+                    },
+                  ].map((axis) => (
+                    <div
+                      key={axis.id}
+                      data-testid={axis.id}
+                      className="rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] p-2.5"
+                    >
+                      <div className="flex items-center justify-between text-[10px] text-[var(--text-muted)]">
+                        <span>{axis.label}</span>
+                        <span className="font-mono-tech text-[var(--text-dim)]">
+                          {axis.band}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex items-baseline justify-between">
+                        <span
+                          className={`font-mono-tech text-base font-extrabold ${
+                            axis.ok
+                              ? 'text-[var(--accent-emerald)]'
+                              : 'text-[var(--accent-rose)]'
+                          }`}
+                        >
+                          {axis.value.toFixed(1)}%
+                        </span>
+                        <span
+                          className={`font-mono-tech text-[9px] font-bold uppercase ${
+                            axis.ok
+                              ? 'text-[var(--accent-emerald)]'
+                              : 'text-[var(--accent-rose)]'
+                          }`}
+                        >
+                          {axis.ok ? 'OK' : 'WARN'}
+                        </span>
+                      </div>
+                      <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-subtle)]">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            axis.ok
+                              ? 'bg-[var(--accent-emerald)]'
+                              : 'bg-[var(--accent-rose)]'
+                          }`}
+                          style={{ width: `${Math.min(100, Math.max(2, axis.value))}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Axle Weight Distribution + SOLAS e-VGM Gross Mass */}
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] p-2.5">
+                    <div className="flex items-center justify-between text-[10px] font-semibold text-[var(--text-muted)]">
+                      <span>{t.packerAxleBalance}</span>
+                      <span className="font-mono-tech text-[var(--text)]">
+                        {currentBay.frontAxleSharePct}% / {currentBay.rearAxleSharePct}%
+                      </span>
+                    </div>
+                    <div className="mt-1.5 flex h-2 w-full overflow-hidden rounded-full bg-[var(--bg-subtle)]">
+                      <div
+                        className="bg-[var(--accent-cyan)] transition-all"
+                        style={{ width: `${currentBay.frontAxleSharePct}%` }}
+                      />
+                      <div
+                        className="bg-[var(--accent-amber)] transition-all"
+                        style={{ width: `${currentBay.rearAxleSharePct}%` }}
+                      />
+                    </div>
+                    <div className="font-mono-tech mt-1 flex items-center justify-between text-[10px] text-[var(--text-dim)]">
+                      <span>
+                        {t.packerFrontAxle}:{' '}
+                        {Math.round(
+                          (currentBay.usedWeightKg * currentBay.frontAxleSharePct) / 100,
+                        ).toLocaleString('en-US')}{' '}
+                        kg
+                      </span>
+                      <span>
+                        {t.packerRearAxle}:{' '}
+                        {Math.round(
+                          (currentBay.usedWeightKg * currentBay.rearAxleSharePct) / 100,
+                        ).toLocaleString('en-US')}{' '}
+                        kg
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] p-2.5">
+                    <div className="flex items-center justify-between text-[10px] font-semibold text-[var(--text-muted)]">
+                      <span className="flex items-center gap-1">
+                        <ShieldCheckIcon className="h-3.5 w-3.5 text-[var(--accent-cyan)]" />
+                        {t.packerVgmGross}
+                      </span>
+                      <span className="font-mono-tech text-[var(--text-dim)]">
+                        MAX {currentBay.maxGrossSolasKg.toLocaleString('en-US')} kg
+                      </span>
+                    </div>
+                    <div
+                      data-testid="solas-vgm-mass"
+                      className="font-mono-tech mt-1 text-base font-extrabold text-[var(--text)]"
+                    >
+                      {currentBay.vgmGrossKg.toLocaleString('en-US')} kg
+                    </div>
+                    <div className="font-mono-tech mt-0.5 text-[10px] text-[var(--text-dim)]">
+                      Tare {result.container.tareWeightKg.toLocaleString('en-US')} kg + Cargo{' '}
+                      {currentBay.usedWeightKg.toLocaleString('en-US')} kg
+                    </div>
+                  </div>
+                </div>
+
+                {currentBay.solasViolations.length > 0 && (
+                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                    {currentBay.solasViolations.map((code) => (
+                      <span
+                        key={code}
+                        className="font-mono-tech rounded border border-[var(--accent-rose)]/40 bg-[var(--accent-rose-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--accent-rose)]"
+                      >
+                        {code}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Unfit Carton Warning */}
             {result.unfitCartons > 0 && (
               <div className="flex items-center gap-2.5 rounded-xl border border-[var(--accent-rose)]/40 bg-[var(--accent-rose-soft)] px-4 py-3 text-xs font-semibold text-[var(--accent-rose)]">
@@ -903,7 +1165,10 @@ export function ContainerStuffingOptimizer({
                     container={result.container}
                     boxes={currentBay?.placedBoxes ?? []}
                     highlightedSkuId={highlightedSkuId}
-                    cogPct={currentBay?.centerOfGravityPct ?? 50}
+                    cgXPct={currentBay?.cgXPct ?? 50}
+                    cgYPct={currentBay?.cgYPct ?? 50}
+                    cgZPct={currentBay?.cgZPct ?? 0}
+                    solasCompliant={currentBay?.solasVgmCompliant ?? true}
                     onHoverSku={setHighlightedSkuId}
                   />
                 ) : (
@@ -912,7 +1177,10 @@ export function ContainerStuffingOptimizer({
                     container={result.container}
                     boxes={currentBay?.placedBoxes ?? []}
                     highlightedSkuId={highlightedSkuId}
-                    cogPct={currentBay?.centerOfGravityPct ?? 50}
+                    cgXPct={currentBay?.cgXPct ?? 50}
+                    cgYPct={currentBay?.cgYPct ?? 50}
+                    cgZPct={currentBay?.cgZPct ?? 0}
+                    solasCompliant={currentBay?.solasVgmCompliant ?? true}
                     onHoverSku={setHighlightedSkuId}
                   />
                 )}

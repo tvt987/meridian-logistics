@@ -259,6 +259,13 @@ export interface SkuPackingSummary {
   stackable: boolean;
 }
 
+export type SolasViolationCode =
+  | 'OVERWEIGHT_PAYLOAD'
+  | 'LONGITUDINAL_IMBALANCE'
+  | 'LATERAL_IMBALANCE'
+  | 'HIGH_VERTICAL_CG'
+  | 'OVERSIZE_CARGO';
+
 export interface ContainerLoadBay {
   index: number;
   cartonCount: number;
@@ -266,7 +273,18 @@ export interface ContainerLoadBay {
   volumeUtilizationPct: number;
   usedWeightKg: number;
   payloadUtilizationPct: number;
-  centerOfGravityPct: number; // 0..100 along container length
+  centerOfGravityPct: number; // 0..100 along container length (alias of cgXPct)
+  cgXPct: number; // Longitudinal CG (0=nose, 100=door)
+  cgYPct: number; // Lateral CG (0=left wall, 100=right wall)
+  cgZPct: number; // Vertical CG (0=floor, 100=roof)
+  frontAxleSharePct: number; // Nose / kingpin axle load share %
+  rearAxleSharePct: number; // Rear tandem axle load share %
+  leftSideSharePct: number;
+  rightSideSharePct: number;
+  vgmGrossKg: number; // SOLAS Verified Gross Mass (Tare + Cargo)
+  maxGrossSolasKg: number; // CSC plate max gross mass (Tare + Max Payload)
+  solasVgmCompliant: boolean;
+  solasViolations: SolasViolationCode[];
   placedBoxes: PlacedCartonBox[];
 }
 
@@ -282,6 +300,15 @@ export interface ContainerPackingResult {
   payloadUtilizationPct: number;
   limitingFactor: 'volume' | 'payload' | 'dimensions';
   centerOfGravityPct: number;
+  cgXPct: number;
+  cgYPct: number;
+  cgZPct: number;
+  frontAxleSharePct: number;
+  rearAxleSharePct: number;
+  vgmGrossKg: number;
+  maxGrossSolasKg: number;
+  solasVgmCompliant: boolean;
+  solasViolations: SolasViolationCode[];
   balanceStatus: 'balanced' | 'nose-heavy' | 'tail-heavy';
   skuBreakdown: SkuPackingSummary[];
   containers: ContainerLoadBay[];
@@ -390,3 +417,91 @@ export interface ExceptionAlert {
 }
 
 export type PrintDocTab = 'bl' | 'invoice' | 'packing';
+
+/* ============================================================================
+ * v3.0 CONTROL TOWER TYPES — Port Disruption & Multimodal Reroute Simulator
+ * ============================================================================ */
+
+export type DisruptionScenarioId =
+  | 'red-sea-suez'
+  | 'cat-lai-congestion'
+  | 'uswc-port-strike';
+
+export type RerouteModeId = 'ocean-direct' | 'sea-air-hybrid' | 'direct-air';
+
+export interface DisruptionScenarioMeta {
+  id: DisruptionScenarioId;
+  code: string;
+  severity: 'critical' | 'high';
+  titleEn: string;
+  titleVi: string;
+  subtitleEn: string;
+  subtitleVi: string;
+  affectedRegionsEn: string;
+  affectedRegionsVi: string;
+  oceanDelayBadge: string;
+}
+
+export interface RerouteCargoProfile {
+  id: string;
+  labelEn: string;
+  labelVi: string;
+  corridorId: string;
+  cargoWeightKg: number;
+  cargoVolumeCbm: number;
+  cargoValueUsd: number;
+  slaDeadlineDays: number;
+}
+
+export interface RerouteSimulationInput {
+  corridorId: string;
+  cargoWeightKg: number;
+  cargoVolumeCbm: number;
+  cargoValueUsd: number;
+  slaDeadlineDays: number;
+  activeDisruptions: DisruptionScenarioId[];
+  dailyPenaltyOverrideUsd?: number;
+}
+
+export interface RerouteOptionResult {
+  modeId: RerouteModeId;
+  labelEn: string;
+  labelVi: string;
+  routingPathEn: string;
+  routingPathVi: string;
+  hubCode: string;
+  hubNameEn: string;
+  hubNameVi: string;
+  baseLeadTimeDays: number;
+  disruptionDelayDays: number;
+  totalLeadTimeDays: number;
+  slaBreachDays: number;
+  slaCompliant: boolean;
+  freightCostUsd: number;
+  disruptionSurchargeUsd: number;
+  workingCapitalCarryUsd: number;
+  slaBreachPenaltyUsd: number;
+  inventoryHoldingPenaltyUsd: number;
+  totalLandedCostUsd: number;
+  totalLandedCostVnd: number;
+  estimatedCo2Kg: number;
+  carbonIntensityKgPerTon: number;
+  resilienceScore: number;
+  recommended: boolean;
+  linkedQuoteMode: TransportMode;
+}
+
+export interface RerouteSimulationResult {
+  corridorId: string;
+  corridorCode: string;
+  activeDisruptions: DisruptionScenarioId[];
+  cargoWeightKg: number;
+  cargoVolumeCbm: number;
+  cargoValueUsd: number;
+  slaDeadlineDays: number;
+  recommendedMode: RerouteModeId;
+  leadTimeSavedVsOceanDays: number;
+  netCostDeltaRecommendedVsOceanUsd: number;
+  seaAirCo2SavingsVsAirPct: number;
+  options: RerouteOptionResult[];
+}

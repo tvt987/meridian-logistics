@@ -38,6 +38,7 @@ export function Navbar({
 
   const navLinks = [
     { href: '#control-map', label: t.navMap },
+    { href: '#reroute-lab', label: t.navReroute },
     { href: '#container-optimizer', label: t.navContainer },
     { href: '#customs-duty', label: t.navCustoms },
     { href: '#quote-engine', label: t.navQuote },

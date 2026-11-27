@@ -1,0 +1,423 @@
+openapi: 3.1.0
+info:
+  title: Meridian Global Freight Control Tower & Vietnam Customs API
+  version: 3.0.0
+  summary: .NET 10 Minimal API for multimodal volumetric freight quoting, Vietnam HS/FTA customs landed-cost calculation, 3D container SOLAS VGM balance auditing, and port disruption reroute optimization.
+  contact:
+    name: Truong Van Tinh (Solution Architect)
+    email: tinhkun102@gmail.com
+    url: https://github.com/tvt987/meridian-logistics
+  license:
+    name: MIT
+servers:
+  - url: http://localhost:5080
+    description: Local Docker / .NET 10 Kestrel API
+  - url: http://localhost:8080
+    description: Local Nginx Gateway (proxies /api/* to .NET 10 API)
+
+tags:
+  - name: System
+    description: Service health and catalog readiness telemetry
+  - name: Freight
+    description: IATA volumetric (6000/5000), W/M LCL, and FCL multimodal quoting (Incoterms 2020)
+  - name: Customs
+    description: Vietnam HS Code CIF valuation & MFN/EVFTA/CPTPP/ACFTA cascading tax engine
+  - name: Containers
+    description: 3D bay-column stuffing, CG X/Y/Z % axle balance & SOLAS Chapter VI e-VGM audit
+  - name: Corridors
+    description: Global port disruption stress-testing & Ocean vs Sea-Air vs Air rerouting
+
+paths:
+  /health:
+    get:
+      tags: [System]
+      summary: Service health check & domain catalog readiness
+      operationId: getHealth
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, service, version, runtime, corridorsLoaded, hsPresetsLoaded, containerSpecsLoaded, timestampUtc]
+                properties:
+                  status: { type: string, example: healthy }
+                  service: { type: string, example: Meridian.Api }
+                  version: { type: string, example: 3.0.0 }
+                  runtime: { type: string, example: .NET 10.0 }
+                  corridorsLoaded: { type: integer, example: 4 }
+                  hsPresetsLoaded: { type: integer, example: 6 }
+                  containerSpecsLoaded: { type: integer, example: 4 }
+                  timestampUtc: { type: string, format: date-time }
+
+  /api/v1/quotes/freight:
+    post:
+      tags: [Freight]
+      summary: Calculate multimodal volumetric/actual/W/M/FCL freight quote (Incoterms 2020)
+      operationId: calculateFreightQuote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FreightQuoteRequest"
+      responses:
+        "200":
+          description: Itemized freight quote with USD/VND totals, 20% VietQR deposit, and CO2e
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FreightQuoteResponse"
+        "400":
+          description: Validation error (RFC 7807 ProblemDetails)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ValidationProblemDetails"
+
+  /api/v1/customs/landed-cost:
+    post:
+      tags: [Customs]
+      summary: Calculate Vietnam HS Code CIF valuation, cascading Duty/SCT/VAT, and 4-regime FTA savings
+      operationId: calculateCustomsLandedCost
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomsLandedCostRequest"
+      responses:
+        "200":
+          description: Landed cost breakdown and MFN vs EVFTA vs CPTPP vs ACFTA matrix
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomsLandedCostResponse"
+        "400":
+          description: Validation error (RFC 7807 ProblemDetails)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ValidationProblemDetails"
+
+  /api/v1/containers/balance-check:
+    post:
+      tags: [Containers]
+      summary: Audit 3D container carton stuffing, Center-of-Gravity (CG X/Y/Z %), axle split, and SOLAS e-VGM compliance
+      operationId: checkContainerBalance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContainerBalanceRequest"
+      responses:
+        "200":
+          description: SOLAS VGM compliance status, 3D CG X/Y/Z %, axle weight split, and bay audits
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContainerBalanceResponse"
+        "400":
+          description: Validation error (RFC 7807 ProblemDetails)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ValidationProblemDetails"
+
+  /api/v1/corridors/reroute:
+    post:
+      tags: [Corridors]
+      summary: Simulate port disruptions and optimize Ocean Direct vs Sea-Air Hybrid (DXB/SIN) vs Direct Air Freight
+      operationId: simulateCorridorReroute
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CorridorRerouteRequest"
+      responses:
+        "200":
+          description: Side-by-side multimodal lead time, landed cost, inventory holding/SLA penalty, CO2e, and resilience score
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CorridorRerouteResponse"
+        "400":
+          description: Validation error (RFC 7807 ProblemDetails)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ValidationProblemDetails"
+
+components:
+  schemas:
+    FreightQuoteRequest:
+      type: object
+      required: [corridorId, mode, lengthCm, widthCm, heightCm, grossWeightKg, packages, declaredValueUsd, incoterm]
+      properties:
+        corridorId: { type: string, enum: [vn-eu-sea, vn-us-sea, vn-jp-sea, vn-de-air] }
+        mode: { type: string, enum: [air-express, air-standard, sea-lcl, sea-fcl-20, sea-fcl-40, road-ftl] }
+        lengthCm: { type: number, minimum: 1, example: 120 }
+        widthCm: { type: number, minimum: 1, example: 80 }
+        heightCm: { type: number, minimum: 1, example: 95 }
+        grossWeightKg: { type: number, minimum: 0.5, example: 95 }
+        packages: { type: integer, minimum: 1, example: 6 }
+        declaredValueUsd: { type: number, minimum: 0, example: 85000 }
+        incoterm: { type: string, enum: [FOB, CIF, DDP] }
+        customsClearance: { type: boolean, default: false }
+        cargoInsurance: { type: boolean, default: false }
+        reeferMonitoring: { type: boolean, default: false }
+
+    FreightQuoteResponse:
+      type: object
+      properties:
+        corridorId: { type: string }
+        mode: { type: string }
+        incoterm: { type: string }
+        totalVolumeCbm: { type: number }
+        totalGrossWeightKg: { type: number }
+        volumetricWeightKg: { type: number }
+        volumetricDivisor: { type: ["integer", "null"] }
+        chargeableWeightKg: { type: number }
+        revenueTonsCbm: { type: number }
+        containersRequired: { type: integer }
+        containerUtilizationPct: { type: integer }
+        governingMetric: { type: string, enum: [actual, volumetric, cbm, container] }
+        baseFreightUsd: { type: number }
+        fuelSurchargeUsd: { type: number }
+        terminalHandlingUsd: { type: number }
+        customsBrokerageUsd: { type: number }
+        importDutiesUsd: { type: number }
+        insuranceUsd: { type: number }
+        reeferSurchargeUsd: { type: number }
+        totalUsd: { type: number }
+        totalVnd: { type: integer, format: int64 }
+        depositVnd: { type: integer, format: int64 }
+        transitDaysMin: { type: integer }
+        transitDaysMax: { type: integer }
+        estimatedCo2Kg: { type: integer }
+
+    CustomsLandedCostRequest:
+      type: object
+      required: [presetId, regime, fobValueUsd, freightUsd, insuranceUsd, unitQuantity]
+      properties:
+        presetId:
+          type: string
+          enum: [electronics-servers, industrial-machinery, apparel-textiles, specialty-coffee-agri, automotive-ev-parts, cosmetics-medical]
+        customHsCode: { type: ["string", "null"], example: "6201.40.90" }
+        regime: { type: string, enum: [MFN, EVFTA, CPTPP, ACFTA] }
+        fobValueUsd: { type: number, minimum: 1, example: 50000 }
+        freightUsd: { type: number, minimum: 0, example: 3000 }
+        insuranceUsd: { type: number, minimum: 0, example: 250 }
+        unitQuantity: { type: integer, minimum: 1, example: 1000 }
+        vatRatePct: { type: integer, enum: [8, 10], default: 8 }
+        sctRatePct: { type: number, minimum: 0, maximum: 150, default: 0 }
+        localClearanceFeesUsd: { type: number, minimum: 0, default: 340 }
+
+    FtaRegimeComparison:
+      type: object
+      properties:
+        regime: { type: string }
+        certificateLabel: { type: string }
+        dutyRatePct: { type: number }
+        importDutyUsd: { type: number }
+        sctUsd: { type: number }
+        vatUsd: { type: number }
+        totalTaxesUsd: { type: number }
+        totalLandedCostUsd: { type: number }
+        totalLandedCostVnd: { type: integer, format: int64 }
+        landedCostPerUnitUsd: { type: number }
+        savingsVsMfnUsd: { type: number }
+        savingsVsMfnVnd: { type: integer, format: int64 }
+
+    CustomsLandedCostResponse:
+      type: object
+      properties:
+        presetId: { type: string }
+        hsCode: { type: string }
+        category: { type: string }
+        regime: { type: string }
+        unitQuantity: { type: integer }
+        fobValueUsd: { type: number }
+        freightUsd: { type: number }
+        insuranceUsd: { type: number }
+        cifValueUsd: { type: number }
+        cifValueVnd: { type: integer, format: int64 }
+        appliedDutyRatePct: { type: number }
+        sctRatePct: { type: number }
+        vatRatePct: { type: integer }
+        importDutyUsd: { type: number }
+        sctUsd: { type: number }
+        vatUsd: { type: number }
+        totalTaxesUsd: { type: number }
+        localClearanceFeesUsd: { type: number }
+        totalLandedCostUsd: { type: number }
+        totalLandedCostVnd: { type: integer, format: int64 }
+        landedCostPerUnitUsd: { type: number }
+        landedCostPerUnitVnd: { type: integer, format: int64 }
+        effectiveTaxBurdenPct: { type: number }
+        savingsVsMfnUsd: { type: number }
+        savingsVsMfnVnd: { type: integer, format: int64 }
+        bestRegime: { type: string }
+        comparisons:
+          type: array
+          items:
+            $ref: "#/components/schemas/FtaRegimeComparison"
+
+    CargoSkuRequest:
+      type: object
+      required: [skuCode, name, lengthCm, widthCm, heightCm, weightKg, qty]
+      properties:
+        skuCode: { type: string, example: SRV-4U }
+        name: { type: string, example: 4U Rack Server Crates }
+        lengthCm: { type: integer, minimum: 1, example: 118 }
+        widthCm: { type: integer, minimum: 1, example: 76 }
+        heightCm: { type: integer, minimum: 1, example: 84 }
+        weightKg: { type: number, minimum: 0.5, example: 145 }
+        qty: { type: integer, minimum: 1, example: 36 }
+        stackable: { type: boolean, default: true }
+
+    ContainerBalanceRequest:
+      type: object
+      required: [containerType, skus]
+      properties:
+        containerType: { type: string, enum: [20ft-std, 40ft-std, 40ft-hc, 40ft-reefer] }
+        strictSingleContainer: { type: boolean, default: false }
+        skus:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/CargoSkuRequest"
+
+    ContainerBayAudit:
+      type: object
+      properties:
+        index: { type: integer }
+        cartonCount: { type: integer }
+        usedVolumeCbm: { type: number }
+        volumeUtilizationPct: { type: number }
+        usedWeightKg: { type: number }
+        payloadUtilizationPct: { type: number }
+        cgXPct: { type: number }
+        cgYPct: { type: number }
+        cgZPct: { type: number }
+        frontAxleSharePct: { type: number }
+        rearAxleSharePct: { type: number }
+        leftSideSharePct: { type: number }
+        rightSideSharePct: { type: number }
+        vgmGrossKg: { type: number }
+        maxGrossSolasKg: { type: number }
+        solasVgmCompliant: { type: boolean }
+        solasViolations:
+          type: array
+          items:
+            type: string
+            enum: [OVERWEIGHT_PAYLOAD, LONGITUDINAL_IMBALANCE, LATERAL_IMBALANCE, HIGH_VERTICAL_CG, OVERSIZE_CARGO]
+
+    ContainerBalanceResponse:
+      type: object
+      properties:
+        containerType: { type: string }
+        containerCode: { type: string }
+        status: { type: string, enum: [APPROVED_SOLAS_VGM, REJECTED_SOLAS_VGM] }
+        containersRequired: { type: integer }
+        totalRequestedCartons: { type: integer }
+        totalLoadedCartons: { type: integer }
+        unfitCartons: { type: integer }
+        totalCargoVolumeCbm: { type: number }
+        totalCargoWeightKg: { type: number }
+        volumeUtilizationPct: { type: number }
+        payloadUtilizationPct: { type: number }
+        limitingFactor: { type: string, enum: [volume, payload, dimensions] }
+        cgXPct: { type: number }
+        cgYPct: { type: number }
+        cgZPct: { type: number }
+        frontAxleSharePct: { type: number }
+        rearAxleSharePct: { type: number }
+        vgmGrossKg: { type: number }
+        maxGrossSolasKg: { type: number }
+        balanceStatus: { type: string }
+        solasVgmCompliant: { type: boolean }
+        solasViolations:
+          type: array
+          items: { type: string }
+        bays:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContainerBayAudit"
+
+    CorridorRerouteRequest:
+      type: object
+      required: [corridorId, cargoWeightKg, cargoVolumeCbm, cargoValueUsd, slaDeadlineDays, activeDisruptions]
+      properties:
+        corridorId: { type: string, enum: [vn-eu-sea, vn-us-sea, vn-jp-sea, vn-de-air] }
+        cargoWeightKg: { type: number, minimum: 1, example: 4200 }
+        cargoVolumeCbm: { type: number, minimum: 0.5, example: 22 }
+        cargoValueUsd: { type: number, minimum: 100, example: 180000 }
+        slaDeadlineDays: { type: integer, minimum: 1, example: 24 }
+        activeDisruptions:
+          type: array
+          items:
+            type: string
+            enum: [red-sea-suez, cat-lai-congestion, uswc-port-strike]
+        dailyPenaltyOverrideUsd: { type: ["number", "null"] }
+
+    RerouteOptionDto:
+      type: object
+      properties:
+        modeId: { type: string, enum: [ocean-direct, sea-air-hybrid, direct-air] }
+        label: { type: string }
+        routingPath: { type: string }
+        hubCode: { type: string }
+        hubName: { type: string }
+        baseLeadTimeDays: { type: number }
+        disruptionDelayDays: { type: number }
+        totalLeadTimeDays: { type: number }
+        slaBreachDays: { type: integer }
+        slaCompliant: { type: boolean }
+        freightCostUsd: { type: number }
+        disruptionSurchargeUsd: { type: number }
+        workingCapitalCarryUsd: { type: number }
+        slaBreachPenaltyUsd: { type: number }
+        inventoryHoldingPenaltyUsd: { type: number }
+        totalLandedCostUsd: { type: number }
+        totalLandedCostVnd: { type: integer, format: int64 }
+        estimatedCo2Kg: { type: integer }
+        carbonIntensityKgPerTon: { type: number }
+        resilienceScore: { type: integer }
+        recommended: { type: boolean }
+
+    CorridorRerouteResponse:
+      type: object
+      properties:
+        corridorId: { type: string }
+        corridorCode: { type: string }
+        activeDisruptions:
+          type: array
+          items: { type: string }
+        cargoWeightKg: { type: number }
+        cargoVolumeCbm: { type: number }
+        cargoValueUsd: { type: number }
+        slaDeadlineDays: { type: integer }
+        recommendedMode: { type: string }
+        leadTimeSavedVsOceanDays: { type: number }
+        netCostDeltaRecommendedVsOceanUsd: { type: number }
+        seaAirCo2SavingsVsAirPct: { type: number }
+        options:
+          type: array
+          items:
+            $ref: "#/components/schemas/RerouteOptionDto"
+
+    ValidationProblemDetails:
+      type: object
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer, example: 400 }
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }

@@ -9,9 +9,25 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       output: {
-        manualChunks: {
-          react: ['react', 'react-dom'],
-          qrcode: ['qrcode'],
+        manualChunks(id) {
+          if (
+            id.includes('node_modules/react/') ||
+            id.includes('node_modules/react-dom/') ||
+            id.includes('node_modules/scheduler/')
+          ) {
+            return 'react';
+          }
+          if (id.includes('node_modules/qrcode')) {
+            return 'qrcode';
+          }
+          if (
+            id.includes('/src/engines/') &&
+            !id.includes('vietQr') &&
+            !id.includes('__tests__')
+          ) {
+            return 'engines';
+          }
+          return undefined;
         },
       },
     },

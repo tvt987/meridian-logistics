@@ -5,3 +5,8 @@ dist-ssr
 .DS_Store
 Thumbs.db
 coverage
+backend/**/bin/
+backend/**/obj/
+backend/**/TestResults/
+*.user
+*.suo

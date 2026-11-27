@@ -4,6 +4,7 @@ import {
   computeMaxCartonsInSingleContainer,
   CONTAINER_LIST,
   CONTAINER_SPECS,
+  evaluateSolasVgmCompliance,
   optimizeContainerLoad,
   STUFFING_PRESETS,
 } from '../containerPackingEngine';
@@ -235,5 +236,65 @@ describe('Container Load & Carton Stuffing Optimizer (src/engines/containerPacki
     expect(Number.isFinite(res.volumeUtilizationPct)).toBe(true);
     expect(Number.isFinite(res.payloadUtilizationPct)).toBe(true);
     expect(res.totalLoadedCartons).toBe(0);
+  });
+
+  it('computes 3D Center-of-Gravity (CG X/Y/Z %) and front/rear axle weight shares summing to 100%', () => {
+    const preset = STUFFING_PRESETS[0];
+    const res = optimizeContainerLoad(preset.containerType, preset.skus);
+    expect(res.cgXPct).toBeGreaterThan(36);
+    expect(res.cgXPct).toBeLessThan(64);
+    expect(res.cgYPct).toBeGreaterThan(38);
+    expect(res.cgYPct).toBeLessThan(62);
+    expect(res.cgZPct).toBeGreaterThan(15);
+    expect(res.cgZPct).toBeLessThanOrEqual(58);
+    expect(res.frontAxleSharePct + res.rearAxleSharePct).toBeCloseTo(100, 1);
+    expect(res.solasVgmCompliant).toBe(true);
+    expect(res.solasViolations).toEqual([]);
+  });
+
+  it('calculates exact SOLAS e-VGM Gross Mass (Tare + Cargo) and CSC Max Gross Mass', () => {
+    const res = optimizeContainerLoad('20ft-std', [{ ...SAMPLE_SKU, qty: 20 }]);
+    const spec = CONTAINER_SPECS['20ft-std'];
+    expect(res.vgmGrossKg).toBe(spec.tareWeightKg + 20 * 250);
+    expect(res.maxGrossSolasKg).toBe(spec.tareWeightKg + spec.maxPayloadKg);
+    expect(res.solasVgmCompliant).toBe(true);
+  });
+
+  it('flags SOLAS VGM FAIL with LONGITUDINAL_IMBALANCE when cargo is clustered at container nose', () => {
+    const res = optimizeContainerLoad('40ft-hc', [{ ...SAMPLE_SKU, qty: 2 }]);
+    expect(res.cgXPct).toBeLessThan(36);
+    expect(res.solasVgmCompliant).toBe(false);
+    expect(res.solasViolations).toContain('LONGITUDINAL_IMBALANCE');
+    expect(res.frontAxleSharePct).toBeGreaterThan(80);
+  });
+
+  it('rejects SOLAS VGM compliance with OVERWEIGHT_PAYLOAD when cargo weight exceeds container maxPayloadKg', () => {
+    const spec = CONTAINER_SPECS['20ft-std'];
+    const audit = evaluateSolasVgmCompliance({
+      container: spec,
+      usedWeightKg: spec.maxPayloadKg + 500,
+      cgXPct: 50,
+      cgYPct: 50,
+      cgZPct: 40,
+      cartonCount: 20,
+    });
+    expect(audit.solasVgmCompliant).toBe(false);
+    expect(audit.solasViolations).toContain('OVERWEIGHT_PAYLOAD');
+    expect(audit.vgmGrossKg).toBeGreaterThan(audit.maxGrossSolasKg);
+  });
+
+  it('flags HIGH_VERTICAL_CG and LATERAL_IMBALANCE violations in SOLAS CTU stability check', () => {
+    const spec = CONTAINER_SPECS['40ft-hc'];
+    const audit = evaluateSolasVgmCompliance({
+      container: spec,
+      usedWeightKg: 12000,
+      cgXPct: 50,
+      cgYPct: 28,
+      cgZPct: 64,
+      cartonCount: 16,
+    });
+    expect(audit.solasVgmCompliant).toBe(false);
+    expect(audit.solasViolations).toContain('LATERAL_IMBALANCE');
+    expect(audit.solasViolations).toContain('HIGH_VERTICAL_CG');
   });
 });

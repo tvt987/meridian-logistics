@@ -1,6 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
-import { BillOfLadingPrint } from './components/BillOfLadingPrint';
-import { ContainerStuffingOptimizer } from './components/ContainerStuffingOptimizer';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { ControlTowerHero } from './components/ControlTowerHero';
 import { CustomsDutyCalculator } from './components/CustomsDutyCalculator';
 import { ExceptionControlTower } from './components/ExceptionControlTower';
@@ -48,8 +46,30 @@ import type {
   PrintDocTab,
   ShippingCorridor,
   Theme,
+  TransportMode,
   WaybillRecord,
 } from './types/logistics';
+
+const PortRerouteLab = lazy(() => import('./components/PortRerouteLab'));
+const Container3DPacker = lazy(() => import('./components/Container3DPacker'));
+const TradeDocStudio = lazy(() => import('./components/TradeDocStudio'));
+
+function SectionLoadingSkeleton({ label }: { label: string }) {
+  return (
+    <section
+      aria-busy="true"
+      className="no-print border-b border-[var(--border)] py-12"
+    >
+      <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8">
+        <div className="panel-card flex h-44 items-center justify-center rounded-xl">
+          <span className="font-mono-tech text-xs font-semibold uppercase tracking-widest text-[var(--text-muted)]">
+            {label}
+          </span>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 export function App() {
   const [lang, setLang] = useState<Lang>('en');
@@ -60,7 +80,7 @@ export function App() {
     SHIPPING_CORRIDORS[0].id,
   );
 
-  // v2.0 Container Load & Carton Stuffing Optimizer State
+  // Container Load & Carton Stuffing Optimizer State
   const [containerType, setContainerType] = useState<ContainerTypeId>(
     STUFFING_PRESETS[0].containerType,
   );
@@ -68,7 +88,7 @@ export function App() {
     STUFFING_PRESETS[0].skus.map((s) => ({ ...s })),
   );
 
-  // v2.0 Vietnam HS Code & FTA Customs Duty State
+  // Vietnam HS Code & FTA Customs Duty State
   const [dutyInput, setDutyInput] = useState<CustomsDutyInput>(() => {
     const p = VIETNAM_HS_PRESETS[0];
     return {
@@ -155,6 +175,35 @@ export function App() {
     el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  const handleApplyRerouteToQuote = (payload: {
+    corridorId: string;
+    mode: TransportMode;
+    cargoWeightKg: number;
+    cargoVolumeCbm: number;
+    cargoValueUsd: number;
+  }) => {
+    const packages = Math.max(1, Math.round(payload.cargoVolumeCbm / 1.1));
+    const avgPkgWeight = Math.max(
+      1,
+      Math.round(payload.cargoWeightKg / packages),
+    );
+    const avgCbmPerPkg = payload.cargoVolumeCbm / packages;
+    const sideCm = Math.max(25, Math.round(Math.cbrt(avgCbmPerPkg * 1_000_000)));
+    setQuoteInput((prev) => ({
+      ...prev,
+      corridorId: payload.corridorId,
+      mode: payload.mode,
+      lengthCm: sideCm,
+      widthCm: sideCm,
+      heightCm: sideCm,
+      grossWeightKg: avgPkgWeight,
+      packages,
+      declaredValueUsd: payload.cargoValueUsd,
+    }));
+    const el = document.getElementById('quote-engine');
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   const handleSendContainerLoadToQuote = (payload: {
     container: ContainerSpec;
     totalWeightKg: number;
@@ -166,7 +215,8 @@ export function App() {
       1,
       Math.round(payload.totalWeightKg / Math.max(1, payload.totalCartons)),
     );
-    const avgCbmPerPkg = payload.totalVolumeCbm / Math.max(1, payload.totalCartons);
+    const avgCbmPerPkg =
+      payload.totalVolumeCbm / Math.max(1, payload.totalCartons);
     const sideCm = Math.max(20, Math.round(Math.cbrt(avgCbmPerPkg * 1_000_000)));
     setQuoteInput((prev) => ({
       ...prev,
@@ -273,20 +323,39 @@ export function App() {
           onLoadCorridorToQuote={handleLoadCorridorToQuote}
         />
 
-        <ContainerStuffingOptimizer
-          t={t}
-          lang={lang}
-          containerType={containerType}
-          setContainerType={setContainerType}
-          skus={packingSkus}
-          setSkus={setPackingSkus}
-          onSendLoadToQuote={handleSendContainerLoadToQuote}
-          onOpenPackingListPrint={() => {
-            if (activePrintWaybill) {
-              handleOpenPrintDoc(activePrintWaybill, 'packing');
-            }
-          }}
-        />
+        <Suspense
+          fallback={
+            <SectionLoadingSkeleton label="Loading Port Disruption Reroute Simulator..." />
+          }
+        >
+          <PortRerouteLab
+            t={t}
+            lang={lang}
+            currency={currency}
+            onApplyRerouteToQuote={handleApplyRerouteToQuote}
+          />
+        </Suspense>
+
+        <Suspense
+          fallback={
+            <SectionLoadingSkeleton label="Loading 3D Container SOLAS VGM Packer..." />
+          }
+        >
+          <Container3DPacker
+            t={t}
+            lang={lang}
+            containerType={containerType}
+            setContainerType={setContainerType}
+            skus={packingSkus}
+            setSkus={setPackingSkus}
+            onSendLoadToQuote={handleSendContainerLoadToQuote}
+            onOpenPackingListPrint={() => {
+              if (activePrintWaybill) {
+                handleOpenPrintDoc(activePrintWaybill, 'packing');
+              }
+            }}
+          />
+        </Suspense>
 
         <CustomsDutyCalculator
           t={t}
@@ -342,20 +411,22 @@ export function App() {
 
       <Footer t={t} />
 
-      {activePrintWaybill && (
-        <BillOfLadingPrint
-          t={t}
-          lang={lang}
-          currency={currency}
-          printWaybill={activePrintWaybill}
-          modalWaybill={blModalWaybill}
-          docTab={docTab}
-          setDocTab={setDocTab}
-          packingSkus={packingSkus}
-          packingContainer={CONTAINER_SPECS[containerType]}
-          customsResult={liveCustomsResult}
-          onCloseModal={() => setBlModalWaybill(null)}
-        />
+      {activePrintWaybill && blModalWaybill && (
+        <Suspense fallback={null}>
+          <TradeDocStudio
+            t={t}
+            lang={lang}
+            currency={currency}
+            printWaybill={activePrintWaybill}
+            modalWaybill={blModalWaybill}
+            docTab={docTab}
+            setDocTab={setDocTab}
+            packingSkus={packingSkus}
+            packingContainer={CONTAINER_SPECS[containerType]}
+            customsResult={liveCustomsResult}
+            onCloseModal={() => setBlModalWaybill(null)}
+          />
+        </Suspense>
       )}
     </div>
   );

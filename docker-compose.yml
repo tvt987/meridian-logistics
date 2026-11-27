@@ -1,0 +1,79 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: meridian-web
+    ports:
+      - "8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - meridian-net
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: meridian-api
+    ports:
+      - "5080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Postgres: "Host=postgres;Port=5432;Database=meridian_logistics;Username=meridian;Password=meridian_dev_password"
+      ConnectionStrings__Redis: "redis:6379"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - meridian-net
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: meridian-postgres
+    environment:
+      POSTGRES_DB: meridian_logistics
+      POSTGRES_USER: meridian
+      POSTGRES_PASSWORD: meridian_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - meridian-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U meridian -d meridian_logistics"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - meridian-net
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: meridian-redis
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - meridian-redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - meridian-net
+    restart: unless-stopped
+
+networks:
+  meridian-net:
+    driver: bridge
+
+volumes:
+  meridian-pgdata:
+  meridian-redisdata:
