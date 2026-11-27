@@ -505,3 +505,193 @@ export interface RerouteSimulationResult {
   seaAirCo2SavingsVsAirPct: number;
   options: RerouteOptionResult[];
 }
+
+/* ============================================================================
+ * v4.0 MARITIME CONTROL TOWER TYPES — Global Sea-Lane Map & Incoterms 2020
+ * ============================================================================ */
+
+export type MapPortType = 'sea' | 'air' | 'multimodal' | 'chokepoint';
+export type PortStatusLevel = 'optimal' | 'moderate' | 'elevated' | 'critical';
+export type SeaLaneKind =
+  | 'ocean-direct'
+  | 'cape-reroute'
+  | 'sea-air-hybrid'
+  | 'direct-air';
+export type SeaLaneStatus =
+  | 'active'
+  | 'rerouted'
+  | 'congested'
+  | 'standby'
+  | 'blocked';
+
+export interface GlobalPortNodeSpec {
+  code: string;
+  shortLabel: string;
+  nameEn: string;
+  nameVi: string;
+  countryEn: string;
+  countryVi: string;
+  regionEn: string;
+  regionVi: string;
+  x: number;
+  y: number;
+  type: MapPortType;
+  baseDwellHours: number;
+  baseCongestionPct: number;
+  annualThroughputMTeu: number;
+  dailyThroughputTeu: number;
+  customsChannel: 'GREEN' | 'AMBER' | 'TRANSIT';
+  linkedCorridorId: string;
+}
+
+export interface GlobalPortNode extends GlobalPortNodeSpec {
+  effectiveDwellHours: number;
+  effectiveCongestionPct: number;
+  status: PortStatusLevel;
+  disruptionDeltaHours: number;
+  disruptionImpactEn: string | null;
+  disruptionImpactVi: string | null;
+}
+
+export interface GlobalSeaLane {
+  id: string;
+  corridorId: string;
+  kind: SeaLaneKind;
+  labelEn: string;
+  labelVi: string;
+  badgeText: string;
+  originCode: string;
+  destCode: string;
+  viaCode?: string;
+  svgPath: string;
+  secondaryAirPath?: string;
+  baseTransitDays: number;
+  effectiveTransitDays: number;
+  delayDays: number;
+  status: SeaLaneStatus;
+  vesselName: string;
+  vesselPos: { x: number; y: number };
+  markerType: 'ship' | 'plane' | 'hybrid';
+}
+
+export interface MapDisruptionZone {
+  id: DisruptionScenarioId;
+  code: string;
+  labelEn: string;
+  labelVi: string;
+  impactBadge: string;
+  cx: number;
+  cy: number;
+  radius: number;
+  severity: 'critical' | 'high';
+  active: boolean;
+}
+
+export interface GlobalMapState {
+  ports: GlobalPortNode[];
+  lanes: GlobalSeaLane[];
+  zones: MapDisruptionZone[];
+  activeDisruptions: DisruptionScenarioId[];
+  capeRerouteActive: boolean;
+  congestedPortCount: number;
+  totalDailyTeuAtRisk: number;
+  advisoryEn: string;
+  advisoryVi: string;
+}
+
+export type Incoterm2020Code =
+  | 'EXW'
+  | 'FCA'
+  | 'FOB'
+  | 'CFR'
+  | 'CIF'
+  | 'DAP'
+  | 'DDP';
+
+export type IncotermStageId =
+  | 'factory-gate'
+  | 'origin-inland'
+  | 'export-customs'
+  | 'port-loading'
+  | 'main-freight'
+  | 'marine-insurance'
+  | 'import-customs'
+  | 'buyer-warehouse';
+
+export type IncotermParty = 'seller' | 'buyer';
+
+export interface IncotermsAllocationInput {
+  incoterm: Incoterm2020Code;
+  cargoValueUsd: number;
+  originInlandUsd: number;
+  exportCustomsUsd: number;
+  originThcUsd: number;
+  mainFreightUsd: number;
+  insuranceRatePct: number;
+  importDutyRatePct: number;
+  importCustomsUsd: number;
+  destinationDrayageUsd: number;
+}
+
+export interface IncotermStageBreakdown {
+  index: number; // 1..8
+  id: IncotermStageId;
+  shortEn: string;
+  shortVi: string;
+  labelEn: string;
+  labelVi: string;
+  costOwner: IncotermParty;
+  riskOwner: IncotermParty;
+  costUsd: number;
+  costVnd: number;
+}
+
+export interface IncotermComparisonRow {
+  code: Incoterm2020Code;
+  fullNameEn: string;
+  fullNameVi: string;
+  sellerCostUsd: number;
+  buyerCostUsd: number;
+  sellerSharePct: number;
+  buyerSharePct: number;
+  riskTransferStageIndex: number;
+  costTransferStageIndex: number;
+  hasCostRiskSplit: boolean;
+  insuranceRequired: boolean;
+  seaOnly: boolean;
+}
+
+export interface IncotermsAllocationResult {
+  incoterm: Incoterm2020Code;
+  fullNameEn: string;
+  fullNameVi: string;
+  groupCode: 'E' | 'F' | 'C' | 'D';
+  seaOnly: boolean;
+  transportScopeEn: string;
+  transportScopeVi: string;
+  cargoValueUsd: number;
+  totalLogisticsCostUsd: number;
+  totalLogisticsCostVnd: number;
+  sellerCostUsd: number;
+  sellerCostVnd: number;
+  buyerCostUsd: number;
+  buyerCostVnd: number;
+  sellerSharePct: number;
+  buyerSharePct: number;
+  sellerTotalContractUsd: number;
+  buyerTotalOutlayUsd: number;
+  riskTransferStageIndex: number;
+  riskTransferStageLabelEn: string;
+  riskTransferStageLabelVi: string;
+  costTransferStageIndex: number;
+  costTransferStageLabelEn: string;
+  costTransferStageLabelVi: string;
+  hasCostRiskSplit: boolean;
+  insuranceRequired: boolean;
+  insuranceCoverageEn: string;
+  insuranceCoverageVi: string;
+  complianceWarningsEn: string[];
+  complianceWarningsVi: string[];
+  stages: IncotermStageBreakdown[];
+  allTermsComparison: IncotermComparisonRow[];
+}

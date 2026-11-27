@@ -30,6 +30,8 @@ builder.Services.AddSingleton<IFreightQuoteService, FreightQuoteService>();
 builder.Services.AddSingleton<IVietnamCustomsService, VietnamCustomsService>();
 builder.Services.AddSingleton<IContainerBalanceService, ContainerBalanceService>();
 builder.Services.AddSingleton<ICorridorRerouteService, CorridorRerouteService>();
+builder.Services.AddSingleton<IIncotermsAllocationService, IncotermsAllocationService>();
+builder.Services.AddSingleton<IPortCorridorTelemetryService, PortCorridorTelemetryService>();
 
 var app = builder.Build();
 
@@ -49,11 +51,13 @@ app.MapGet("/health", () => Results.Ok(new
 {
     status = "healthy",
     service = "Meridian.Api",
-    version = "3.0.0",
+    version = "4.0.0",
     runtime = $".NET {Environment.Version.Major}.{Environment.Version.Minor}",
     corridorsLoaded = MeridianCatalog.Corridors.Count,
+    portsLoaded = MeridianCatalog.Ports.Count,
     hsPresetsLoaded = MeridianCatalog.HsPresets.Count,
     containerSpecsLoaded = MeridianCatalog.Containers.Count,
+    incotermsSupported = 7,
     timestampUtc = DateTimeOffset.UtcNow
 }));
 
@@ -147,6 +151,38 @@ v1.MapPost("/corridors/reroute", (CorridorRerouteRequest request, ICorridorRerou
     }
 });
 
+v1.MapPost("/incoterms/allocate", (IncotermsAllocateRequest request, IIncotermsAllocationService service) =>
+{
+    var errors = ValidateIncotermsRequest(request);
+    if (errors.Count > 0)
+    {
+        return Results.ValidationProblem(errors);
+    }
+
+    try
+    {
+        var result = service.Allocate(request);
+        return Results.Ok(result);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["request"] = [ex.Message]
+        });
+    }
+});
+
+v1.MapGet("/corridors/ports", (string? disruptions, IPortCorridorTelemetryService service) =>
+{
+    var active = string.IsNullOrWhiteSpace(disruptions)
+        ? Array.Empty<string>()
+        : disruptions.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    var result = service.GetTelemetry(active);
+    return Results.Ok(result);
+});
+
 app.Run();
 
 static Dictionary<string, string[]> ValidateFreightRequest(FreightQuoteRequest req)
@@ -227,6 +263,23 @@ static Dictionary<string, string[]> ValidateRerouteRequest(CorridorRerouteReques
         errors["cargoValueUsd"] = ["CargoValueUsd must be > 0."];
     if (req.SlaDeadlineDays <= 0)
         errors["slaDeadlineDays"] = ["SlaDeadlineDays must be >= 1."];
+    return errors;
+}
+
+static Dictionary<string, string[]> ValidateIncotermsRequest(IncotermsAllocateRequest req)
+{
+    var errors = new Dictionary<string, string[]>();
+    if (!IncotermsAllocationService.IsSupportedIncoterm(req.Incoterm))
+        errors["incoterm"] = ["Incoterm must be one of EXW, FCA, FOB, CFR, CIF, DAP, DDP."];
+    if (req.CargoValueUsd <= 0)
+        errors["cargoValueUsd"] = ["CargoValueUsd must be > 0."];
+    if (req.OriginInlandUsd < 0 || req.ExportCustomsUsd < 0 || req.OriginThcUsd < 0 ||
+        req.MainFreightUsd < 0 || req.ImportCustomsUsd < 0 || req.DestinationDrayageUsd < 0)
+        errors["costs"] = ["Logistics stage costs cannot be negative."];
+    if (req.InsuranceRatePct < 0 || req.InsuranceRatePct > 10)
+        errors["insuranceRatePct"] = ["InsuranceRatePct must be between 0 and 10."];
+    if (req.ImportDutyRatePct < 0 || req.ImportDutyRatePct > 100)
+        errors["importDutyRatePct"] = ["ImportDutyRatePct must be between 0 and 100."];
     return errors;
 }
 

@@ -5,11 +5,11 @@ type IconProps = SVGProps<SVGSVGElement>;
 export function MeridianLogo({ className = 'w-8 h-8', ...props }: IconProps) {
   return (
     <svg viewBox="0 0 40 40" fill="none" className={className} aria-hidden="true" {...props}>
-      <rect x="2" y="2" width="36" height="36" rx="8" stroke="currentColor" strokeWidth="1.6" strokeOpacity="0.28" />
-      <circle cx="20" cy="20" r="12.5" stroke="#0ea5e9" strokeWidth="1.8" />
-      <path d="M20 5v30M5 20h30" stroke="#0ea5e9" strokeWidth="1.2" strokeOpacity="0.45" />
-      <polygon points="20,9 24.5,20 20,31 15.5,20" fill="#f59e0b" />
-      <circle cx="20" cy="20" r="2.2" fill="#080c12" />
+      <rect x="2" y="2" width="36" height="36" rx="9" fill="var(--bg-navy)" />
+      <circle cx="20" cy="20" r="12" stroke="#38BDF8" strokeWidth="1.8" />
+      <path d="M20 6v28M6 20h28" stroke="#38BDF8" strokeWidth="1.15" strokeOpacity="0.45" />
+      <polygon points="20,9.5 24.5,20 20,30.5 15.5,20" fill="#D97706" />
+      <circle cx="20" cy="20" r="2.2" fill="#FFFFFF" />
     </svg>
   );
 }

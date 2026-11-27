@@ -1,12 +1,12 @@
-# MERIDIAN v3.0 — Global Freight Control Tower & `.NET 10` Customs Monorepo
+# MERIDIAN v4.0 — Daylight Maritime Control Tower, Global Sea-Lane Map & Incoterms 2020 Monorepo
 
-[![Live Control Tower](https://img.shields.io/badge/Live_Demo-GitHub_Pages-0ea5e9?style=for-the-badge)](https://tvt987.github.io/meridian-logistics/)
-[![.NET 10 API](https://img.shields.io/badge/.NET_10-Clean_Architecture-10b981?style=for-the-badge)](./backend/Meridian.sln)
-[![Frontend Tests](https://img.shields.io/badge/Vitest-85_Passing-10b981?style=for-the-badge)](#verification--benchmarks)
-[![Backend Tests](https://img.shields.io/badge/xUnit_.NET_10-22_Passing-10b981?style=for-the-badge)](#verification--benchmarks)
-[![OpenAPI 3.1](https://img.shields.io/badge/OpenAPI-3.1.0-f59e0b?style=for-the-badge)](./docs/openapi.yaml)
+[![Live Control Tower](https://img.shields.io/badge/Live_Demo-GitHub_Pages-0284C7?style=for-the-badge)](https://tvt987.github.io/meridian-logistics/)
+[![.NET 10 API](https://img.shields.io/badge/.NET_10-Clean_Architecture-0F2942?style=for-the-badge)](./backend/Meridian.sln)
+[![Frontend Tests](https://img.shields.io/badge/Vitest-111_Passing-059669?style=for-the-badge)](#verification--benchmarks)
+[![Backend Tests](https://img.shields.io/badge/xUnit_.NET_10-34_Passing-059669?style=for-the-badge)](#verification--benchmarks)
+[![OpenAPI 3.1](https://img.shields.io/badge/OpenAPI-3.1.0-D97706?style=for-the-badge)](./docs/openapi.yaml)
 
-**Meridian Logistics v3.0** is a full-stack global freight control tower, multimodal disruption simulator, 3D SOLAS VGM container balance auditor, and Vietnam HS Code / FTA landed-cost platform built with **React 19 + TypeScript + Tailwind CSS v4** and a **Clean Architecture `.NET 10` Minimal API** (`Meridian.Domain` + `Meridian.Api`).
+**Meridian Logistics v4.0** is a full-stack **Flexport / Maersk Daylight Maritime Control Tower**, animated global sea-lane & air-corridor map, interactive **Incoterms 2020** cost-and-risk transfer visualizer, 3D **SOLAS VGM** container balance auditor, and Vietnam HS Code / FTA landed-cost platform built with **React 19 + TypeScript + Tailwind CSS v4** and a **Clean Architecture `.NET 10` Minimal API** (`Meridian.Domain` + `Meridian.Api`).
 
 ---
 
@@ -14,24 +14,25 @@
 
 ```mermaid
 flowchart LR
-    subgraph Client["Browser SPA (React 19 + TypeScript + Vite 6)"]
-        Hero["ControlTowerHero<br/>AIS/ADS-B Map"]
-        Reroute["Lazy: PortRerouteLab<br/>Disruption Simulator"]
+    subgraph Client["Browser SPA — Maritime Daylight (#F4F7FA) + Night-Watch Dark Mode"]
+        Hero["ControlTowerHero +<br/>GlobalCorridorMap (8 Global Hubs & Live Shocks)"]
+        Reroute["Lazy: PortRerouteLab<br/>Red Sea / Cat Lai / USWC Simulator"]
+        Inco["Lazy: IncotermsChainLab<br/>EXW-DDP 8-Stage Cost & Risk SVG"]
         Packer["Lazy: Container3DPacker<br/>3D CG X/Y/Z & SOLAS VGM"]
-        Customs["CustomsDutyCalculator<br/>MFN / EVFTA / CPTPP / ACFTA"]
-        Quote["FreightQuoteEngine +<br/>Lazy: VietQrModal"]
+        Customs["Lazy: CustomsDutyCalculator<br/>MFN / EVFTA / CPTPP / ACFTA"]
+        Quote["Lazy: FreightQuoteEngine +<br/>Lazy: VietQrModal (MBBank)"]
         Docs["Lazy: TradeDocStudio<br/>A4 B/L, Invoice & Packing List"]
-        Engines["Shared Pure Engines Chunk<br/>(65.58 kB)"]
+        Engines["Shared Pure Engines Chunk<br/>(89.08 kB)"]
     end
 
     subgraph Edge["Nginx 1.27 Gateway (Strict CSP + Gzip)"]
-        Static["Static Code-Split SPA<br/>Entry JS: 126.84 kB"]
+        Static["Code-Split SPA<br/>Entry JS: 87.99 kB (25.12 kB gzip)"]
         Proxy["/api/* Reverse Proxy"]
     end
 
     subgraph Backend[".NET 10 Clean Architecture Backend (Meridian.sln)"]
         Api["Meridian.Api (Minimal API)<br/>RFC 7807 Validation + Security Headers"]
-        Domain["Meridian.Domain (Decimal Core)<br/>Freight / Customs / SOLAS / Reroute"]
+        Domain["Meridian.Domain (Decimal Core)<br/>Freight / Customs / SOLAS / Reroute / Ports / Incoterms"]
     end
 
     subgraph Data["Containerized Infrastructure (Docker Compose)"]
@@ -48,15 +49,17 @@ flowchart LR
 
 ---
 
-## Flagship Capabilities (v3.0)
+## Flagship Capabilities (v4.0)
 
 | Module | Engineering Highlights |
 | :--- | :--- |
-| **Port Disruption & Multimodal Reroute Simulator** | Multi-toggle live shocks (**Red Sea / Suez Transit Closure +12d**, **Cat Lai Peak-Season Congestion +4d**, **US West Coast Port Strike +9d**) comparing **Ocean Direct** vs **Sea-Air Hybrid (Dubai DXB / Singapore SIN)** vs **Direct Air Freight (B777F)** on Lead Time, Total Landed Cost (USD/VND), Working Capital Carry (18% WACC) + SLA Breach Penalty, `kg CO2e` Carbon Intensity, and 0–100 Resilience Score. |
-| **3D Container Stuffing & SOLAS VGM Axle Audit** | Isometric 3D + Orthographic Side (`L x H`) & Top (`L x W`) cargo bay visualizer across ISO `20'GP`, `40'GP`, `40'HC`, and `40'RF` containers with **3-Axis Center-of-Gravity (`CG-X / CG-Y / CG-Z %`)**, **Kingpin vs Rear Tandem Axle Weight Split**, **SOLAS Chapter VI e-VGM Gross Mass**, and explicit `SOLAS VGM PASS / FAIL` compliance gate. |
-| **Vietnam HS Code & FTA Landed-Cost Engine** | Exact Vietnam Customs CIF valuation (`FOB + Freight + Insurance`) with cascading `Import Duty -> Special Consumption Tax (TTDB) -> Import VAT (8% / 10%)` comparing **MFN vs EVFTA (EUR.1/REX) vs CPTPP vs ACFTA (Form E)** and highlighting optimal C/O savings. |
-| **Volumetric Freight Quoter & MBBank VietQR** | IATA Air Express (`6000`), Air Standard (`5000`), Road (`4000`), Sea LCL W/M (`1000`), and FCL `20ft/40ft` pricing with Incoterms 2020 (`FOB / CIF / DDP`), active reefer telemetry, persistent localStorage Shipment Vault, UTF-8 BOM CSV manifest export, MBBank NAPAS 247 VietQR deposits, and printable **A4 Bill of Lading, Commercial Invoice & Packing List**. |
-| **`.NET 10` Clean Architecture Backend** | Compiled `.NET 10` solution (`backend/Meridian.sln`) with decimal financial precision, RFC 7807 `ValidationProblemDetails`, strict security headers, OpenAPI 3.1 contract, and 22 xUnit + `WebApplicationFactory<Program>` integration tests. |
+| **Flexport / Maersk Maritime Daylight Control Tower** | Ice-White Maritime Daylight default boot theme (`#F4F7FA` canvas, `#FFFFFF` structured cards, `#0F2942` Deep Maritime Navy ink, `#0284C7` Ocean Signal Blue, `#D97706` Container Amber) with crisp tabular monospace figures and a live **Night-Watch Dark Mode** toggle in the header. |
+| **Hero Animated Global Sea-Lane & Air-Corridor SVG Map** | Cartographic world chart plotting 8 global trade hubs (**Cat Lai HCMC**, **Hai Phong**, **Singapore SIN**, **Dubai DXB**, **Suez Canal**, **Cape of Good Hope**, **Rotterdam RTM**, **Los Angeles LAX**). Renders animated curved lanes (`Ocean Direct`, `Cape Reroute +12d`, `Sea-Air Hybrid via DXB/SIN`, `Direct Air Freight`) with live moving vessel/aircraft markers, glowing disruption zones synchronized live with the Reroute Lab, and clickable port telemetry inspection (dwell hours, berth congestion %, annual & daily TEU). |
+| **Incoterms 2020 Cost & Risk Transfer Chain Visualizer** | Interactive 8-stage horizontal SVG handover matrix comparing all 7 core **Incoterms 2020** (`EXW`, `FCA`, `FOB`, `CFR`, `CIF`, `DAP`, `DDP`) across *Factory Gate -> Origin Inland -> Export Customs -> Port Loading -> Main Freight -> Marine Insurance -> Import Customs/EVFTA Duty -> Buyer Warehouse* with exact USD/VND Seller vs Buyer allocation, C-term Cost/Risk Split Point pins, mandatory ICC (C) insurance badges, and legal compliance warnings. |
+| **Port Disruption & Multimodal Reroute Simulator** | Multi-toggle live shocks (**Red Sea / Suez Transit Closure +12d**, **Cat Lai Congestion +4d**, **USWC Port Strike +9d**) synchronized with the Hero SVG Map, comparing **Ocean Direct** vs **Sea-Air Hybrid (DXB / SIN)** vs **Direct Air Freight (B777F)** on Lead Time, Total Landed Cost, Working Capital Carry + SLA Penalty, `kg CO2e`, and 0–100 Resilience Score. |
+| **3D Container Stuffing & SOLAS VGM Axle Audit** | Isometric 3D + Orthographic Side (`L x H`) & Top (`L x W`) cargo bay visualizer across ISO `20'GP`, `40'GP`, `40'HC`, and `40'RF` containers with **3-Axis Center-of-Gravity (`CG-X / CG-Y / CG-Z %`)**, **Kingpin vs Rear Tandem Axle Split**, **SOLAS e-VGM Gross Mass**, and explicit `PASS / FAIL` compliance gate. |
+| **Vietnam HS/FTA Customs, Freight Quoter & MBBank VietQR** | Exact Vietnam CIF valuation with cascading `Import Duty -> SCT (TTDB) -> Import VAT (8% / 10%)` across **MFN / EVFTA / CPTPP / ACFTA**, IATA volumetric (`6000`/`5000`) & FCL/LCL pricing, persistent localStorage Shipment Vault, UTF-8 BOM CSV export, MBBank NAPAS 247 VietQR deposits, and printable **A4 Bill of Lading, Commercial Invoice & Packing List**. |
+| **`.NET 10` Clean Architecture Backend** | Compiled `.NET 10` solution (`backend/Meridian.sln`) with decimal financial precision, RFC 7807 `ValidationProblemDetails`, strict security headers, OpenAPI 3.1 contract, and 34 xUnit + `WebApplicationFactory<Program>` integration tests (`0` warnings). |
 
 ---
 
@@ -67,6 +70,8 @@ Full OpenAPI 3.1 specification: [`docs/openapi.yaml`](./docs/openapi.yaml)
 | Method | Endpoint | Purpose |
 | :--- | :--- | :--- |
 | `GET` | `/health` | Service readiness, `.NET 10` runtime telemetry, and loaded domain catalog counts |
+| `GET` | `/api/v1/corridors/ports` | Live global port congestion telemetry (8 hubs), dwell hours, TEU throughput & active corridor statuses (`?disruptions=...`) |
+| `POST` | `/api/v1/incoterms/allocate` | Exact Seller vs Buyer cost split, mandatory insurance rule & risk transfer stage across all 7 Incoterms 2020 (`EXW`–`DDP`) |
 | `POST` | `/api/v1/quotes/freight` | IATA volumetric (`6000`/`5000`), W/M LCL & FCL freight quote with Incoterms 2020 & CO2e |
 | `POST` | `/api/v1/customs/landed-cost` | Vietnam HS Code CIF valuation, cascading Duty/SCT/VAT, and 4-regime FTA savings matrix |
 | `POST` | `/api/v1/containers/balance-check` | 3D bin-packing, `CG X/Y/Z %`, axle weight distribution, and SOLAS e-VGM pass/fail audit |
@@ -97,11 +102,11 @@ docker compose up --build -d
 # Frontend (Node 22+)
 npm ci
 npm run dev           # http://localhost:5173
-npm test              # 85 Vitest unit tests
+npm test              # 111 Vitest unit tests
 npm run build         # Type-check + code-split Vite production bundle
 
 # Backend (.NET 10 SDK)
-dotnet test backend/Meridian.sln     # 22 xUnit + WebApplicationFactory tests
+dotnet test backend/Meridian.sln     # 34 xUnit + WebApplicationFactory tests
 dotnet run --project backend/src/Meridian.Api
 ```
 
@@ -111,10 +116,10 @@ dotnet run --project backend/src/Meridian.Api
 
 | Verification Gate | Tooling | Result |
 | :--- | :--- | :--- |
-| **Frontend Unit Tests** | Vitest 3.2.7 (`npm test`) | **85 / 85 passed** (5 test suites, ~1s) |
-| **Backend Integration Tests** | `.NET 10.0.401` xUnit + `WebApplicationFactory<Program>` (`dotnet test backend/Meridian.sln`) | **22 / 22 passed** (`0` warnings, `0` errors) |
-| **Frontend Bundle Splitting** | Vite 6 + `React.lazy` + `manualChunks` (`npm run build`) | Entry JS `126.84 kB` (`29.87 kB` gzip) · `engines` `65.58 kB` · Lazy chunks: `Container3DPacker` `26.06 kB`, `TradeDocStudio` `24.09 kB`, `PortRerouteLab` `18.24 kB`, `VietQrModal` `9.75 kB`, `qrcode` `25.39 kB` |
-| **Headless E2E Audit** | Playwright Chromium (`1440x900` Desktop + `390x844` Mobile) | **0** console errors · **0** page errors · **0** failed requests · **0px** horizontal overflow · Live disruption toggles & SOLAS CG X/Y/Z verified |
+| **Frontend Unit Tests** | Vitest 3.2.7 (`npm test`) | **111 / 111 passed** (7 test suites, ~2.5s) |
+| **Backend Integration Tests** | `.NET 10` xUnit + `WebApplicationFactory<Program>` (`dotnet test backend/Meridian.sln`) | **34 / 34 passed** (`0` warnings, `0` errors) |
+| **Frontend Bundle Splitting** | Vite 6 + `React.lazy` + `manualChunks` (`npm run build`) | Entry JS **`87.99 kB`** (`25.12 kB` gzip) · `engines` `89.08 kB` · Lazy chunks: `Container3DPacker` `26.06 kB`, `TradeDocStudio` `24.09 kB`, `PortRerouteLab` `18.22 kB`, `FreightQuoteEngine` `16.77 kB`, `CustomsDutyCalculator` `16.58 kB`, `IncotermsChainLab` `16.15 kB`, `WaybillTrackerSection` `13.33 kB`, `VietQrModal` `9.75 kB`, `qrcode` `25.39 kB` |
+| **Headless E2E Audit** | Playwright Chromium (`1440x900` Desktop + `390x844` Mobile) | **0** console errors · **0** page errors · **0** failed requests · **0px** horizontal overflow · Maritime Daylight `#F4F7FA` default, Night-Watch toggle roundtrip, 8-port SVG map + live disruption sync, Incoterms `EXW->FOB->CIF->DDP`, and SOLAS CG X/Y/Z verified live |
 | **Security Posture** | Strict CSP, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Content-Type-Options: nosniff` | Zero `dangerouslySetInnerHTML`, zero `innerHTML`, zero `eval`, zero custom cursors, zero UI emojis |
 
 ---

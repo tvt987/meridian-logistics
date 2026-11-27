@@ -265,3 +265,113 @@ public sealed record CorridorRerouteResponse(
     decimal NetCostDeltaRecommendedVsOceanUsd,
     decimal SeaAirCo2SavingsVsAirPct,
     IReadOnlyList<RerouteOptionDto> Options);
+
+/* ============================================================================
+ * 5. Incoterms 2020 Cost & Risk Transfer Contracts (v4.0)
+ * ============================================================================ */
+
+public sealed record IncotermsAllocateRequest(
+    string Incoterm,
+    decimal CargoValueUsd,
+    decimal OriginInlandUsd = 420m,
+    decimal ExportCustomsUsd = 185m,
+    decimal OriginThcUsd = 390m,
+    decimal MainFreightUsd = 4480m,
+    decimal InsuranceRatePct = 0.45m,
+    decimal ImportDutyRatePct = 3.5m,
+    decimal ImportCustomsUsd = 310m,
+    decimal DestinationDrayageUsd = 680m);
+
+public sealed record IncotermStageAllocationDto(
+    int Index,
+    string Id,
+    string Label,
+    string CostOwner,
+    string RiskOwner,
+    decimal CostUsd,
+    long CostVnd);
+
+public sealed record IncotermsAllocateResponse(
+    string Incoterm,
+    string FullName,
+    string GroupCode,
+    bool SeaOnly,
+    string TransportScope,
+    decimal CargoValueUsd,
+    decimal TotalLogisticsCostUsd,
+    long TotalLogisticsCostVnd,
+    decimal SellerCostUsd,
+    long SellerCostVnd,
+    decimal BuyerCostUsd,
+    long BuyerCostVnd,
+    decimal SellerSharePct,
+    decimal BuyerSharePct,
+    decimal SellerTotalContractUsd,
+    decimal BuyerTotalOutlayUsd,
+    int RiskTransferStageIndex,
+    string RiskTransferStage,
+    int CostTransferStageIndex,
+    string CostTransferStage,
+    bool HasCostRiskSplit,
+    bool InsuranceRequired,
+    string InsuranceCoverageStandard,
+    IReadOnlyList<string> ComplianceWarnings,
+    IReadOnlyList<IncotermStageAllocationDto> Stages);
+
+/* ============================================================================
+ * 6. Global Port Congestion & Corridor Status Telemetry Contracts (v4.0)
+ * ============================================================================ */
+
+public sealed record GlobalPortSpec(
+    string Code,
+    string ShortLabel,
+    string Name,
+    string Country,
+    string Region,
+    string Type,
+    int BaseDwellHours,
+    int BaseCongestionPct,
+    decimal AnnualThroughputMTeu,
+    int DailyThroughputTeu,
+    string CustomsChannel,
+    string LinkedCorridorId);
+
+public sealed record PortTelemetryDto(
+    string Code,
+    string ShortLabel,
+    string Name,
+    string Country,
+    string Region,
+    string Type,
+    int BaseDwellHours,
+    int EffectiveDwellHours,
+    int DisruptionDeltaHours,
+    int BaseCongestionPct,
+    int EffectiveCongestionPct,
+    string Status,
+    decimal AnnualThroughputMTeu,
+    int DailyThroughputTeu,
+    string CustomsChannel,
+    string LinkedCorridorId,
+    string? DisruptionImpact);
+
+public sealed record CorridorStatusDto(
+    string CorridorId,
+    string Code,
+    string OriginCode,
+    string DestCode,
+    int BaseOceanDays,
+    decimal EffectiveOceanDays,
+    string SeaAirHubCode,
+    decimal EffectiveSeaAirDays,
+    string Status,
+    bool CapeRerouteActive);
+
+public sealed record CorridorsPortsTelemetryResponse(
+    IReadOnlyList<string> ActiveDisruptions,
+    bool CapeRerouteActive,
+    int CongestedPortCount,
+    int TotalDailyTeuAtRisk,
+    string Advisory,
+    IReadOnlyList<PortTelemetryDto> Ports,
+    IReadOnlyList<CorridorStatusDto> Corridors);

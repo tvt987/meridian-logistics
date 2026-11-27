@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
-  title: Meridian Global Freight Control Tower & Vietnam Customs API
-  version: 3.0.0
-  summary: .NET 10 Minimal API for multimodal volumetric freight quoting, Vietnam HS/FTA customs landed-cost calculation, 3D container SOLAS VGM balance auditing, and port disruption reroute optimization.
+  title: Meridian Global Maritime Control Tower, Incoterms 2020 & Vietnam Customs API
+  version: 4.0.0
+  summary: .NET 10 Minimal API for multimodal volumetric freight quoting, Vietnam HS/FTA customs landed-cost calculation, 3D container SOLAS VGM balance auditing, port disruption reroute optimization, live global port congestion telemetry, and Incoterms 2020 cost/risk transfer allocation.
   contact:
     name: Truong Van Tinh (Solution Architect)
     email: tinhkun102@gmail.com
@@ -25,7 +25,9 @@ tags:
   - name: Containers
     description: 3D bay-column stuffing, CG X/Y/Z % axle balance & SOLAS Chapter VI e-VGM audit
   - name: Corridors
-    description: Global port disruption stress-testing & Ocean vs Sea-Air vs Air rerouting
+    description: Global port congestion telemetry, disruption stress-testing & Ocean vs Sea-Air vs Air rerouting
+  - name: Incoterms
+    description: ICC Incoterms 2020 (EXW, FCA, FOB, CFR, CIF, DAP, DDP) 8-stage Cost & Risk transfer allocation
 
 paths:
   /health:
@@ -40,15 +42,17 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [status, service, version, runtime, corridorsLoaded, hsPresetsLoaded, containerSpecsLoaded, timestampUtc]
+                required: [status, service, version, runtime, corridorsLoaded, portsLoaded, hsPresetsLoaded, containerSpecsLoaded, incotermsSupported, timestampUtc]
                 properties:
                   status: { type: string, example: healthy }
                   service: { type: string, example: Meridian.Api }
-                  version: { type: string, example: 3.0.0 }
+                  version: { type: string, example: 4.0.0 }
                   runtime: { type: string, example: .NET 10.0 }
                   corridorsLoaded: { type: integer, example: 4 }
+                  portsLoaded: { type: integer, example: 8 }
                   hsPresetsLoaded: { type: integer, example: 6 }
                   containerSpecsLoaded: { type: integer, example: 4 }
+                  incotermsSupported: { type: integer, example: 7 }
                   timestampUtc: { type: string, format: date-time }
 
   /api/v1/quotes/freight:
@@ -144,6 +148,52 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CorridorRerouteResponse"
+        "400":
+          description: Validation error (RFC 7807 ProblemDetails)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ValidationProblemDetails"
+
+  /api/v1/corridors/ports:
+    get:
+      tags: [Corridors]
+      summary: Retrieve live global port congestion telemetry, dwell hours, TEU throughput, and active sea-lane corridor statuses
+      operationId: getGlobalPortsTelemetry
+      parameters:
+        - name: disruptions
+          in: query
+          required: false
+          description: Comma-separated active disruption IDs (red-sea-suez, cat-lai-congestion, uswc-port-strike)
+          schema:
+            type: string
+            example: red-sea-suez,cat-lai-congestion
+      responses:
+        "200":
+          description: Live global port congestion telemetry and corridor status summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CorridorsPortsTelemetryResponse"
+
+  /api/v1/incoterms/allocate:
+    post:
+      tags: [Incoterms]
+      summary: Compute exact Seller vs Buyer cost split, insurance obligation, and risk transfer stage across all 7 Incoterms 2020 (EXW-DDP)
+      operationId: allocateIncoterms2020
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IncotermsAllocateRequest"
+      responses:
+        "200":
+          description: 8-stage Seller vs Buyer USD/VND cost allocation, risk transfer point, C-term split flag, and compliance advisories
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncotermsAllocateResponse"
         "400":
           description: Validation error (RFC 7807 ProblemDetails)
           content:
@@ -421,3 +471,117 @@ components:
           additionalProperties:
             type: array
             items: { type: string }
+
+    IncotermsAllocateRequest:
+      type: object
+      required: [incoterm, cargoValueUsd]
+      properties:
+        incoterm: { type: string, enum: [EXW, FCA, FOB, CFR, CIF, DAP, DDP], example: CIF }
+        cargoValueUsd: { type: number, minimum: 1, example: 120000 }
+        originInlandUsd: { type: number, minimum: 0, default: 420 }
+        exportCustomsUsd: { type: number, minimum: 0, default: 185 }
+        originThcUsd: { type: number, minimum: 0, default: 390 }
+        mainFreightUsd: { type: number, minimum: 0, default: 4480 }
+        insuranceRatePct: { type: number, minimum: 0, maximum: 10, default: 0.45 }
+        importDutyRatePct: { type: number, minimum: 0, maximum: 100, default: 3.5 }
+        importCustomsUsd: { type: number, minimum: 0, default: 310 }
+        destinationDrayageUsd: { type: number, minimum: 0, default: 680 }
+
+    IncotermStageAllocationDto:
+      type: object
+      properties:
+        index: { type: integer, minimum: 1, maximum: 8 }
+        id: { type: string }
+        label: { type: string }
+        costOwner: { type: string, enum: [seller, buyer] }
+        riskOwner: { type: string, enum: [seller, buyer] }
+        costUsd: { type: number }
+        costVnd: { type: integer, format: int64 }
+
+    IncotermsAllocateResponse:
+      type: object
+      properties:
+        incoterm: { type: string, enum: [EXW, FCA, FOB, CFR, CIF, DAP, DDP] }
+        fullName: { type: string }
+        groupCode: { type: string, enum: [E, F, C, D] }
+        seaOnly: { type: boolean }
+        transportScope: { type: string }
+        cargoValueUsd: { type: number }
+        totalLogisticsCostUsd: { type: number }
+        totalLogisticsCostVnd: { type: integer, format: int64 }
+        sellerCostUsd: { type: number }
+        sellerCostVnd: { type: integer, format: int64 }
+        buyerCostUsd: { type: number }
+        buyerCostVnd: { type: integer, format: int64 }
+        sellerSharePct: { type: number }
+        buyerSharePct: { type: number }
+        sellerTotalContractUsd: { type: number }
+        buyerTotalOutlayUsd: { type: number }
+        riskTransferStageIndex: { type: integer }
+        riskTransferStage: { type: string }
+        costTransferStageIndex: { type: integer }
+        costTransferStage: { type: string }
+        hasCostRiskSplit: { type: boolean }
+        insuranceRequired: { type: boolean }
+        insuranceCoverageStandard: { type: string }
+        complianceWarnings:
+          type: array
+          items: { type: string }
+        stages:
+          type: array
+          items:
+            $ref: "#/components/schemas/IncotermStageAllocationDto"
+
+    PortTelemetryDto:
+      type: object
+      properties:
+        code: { type: string, example: VNSGN }
+        shortLabel: { type: string, example: Cat Lai HCMC }
+        name: { type: string }
+        country: { type: string }
+        region: { type: string }
+        type: { type: string, enum: [sea, air, multimodal, chokepoint] }
+        baseDwellHours: { type: integer }
+        effectiveDwellHours: { type: integer }
+        disruptionDeltaHours: { type: integer }
+        baseCongestionPct: { type: integer }
+        effectiveCongestionPct: { type: integer }
+        status: { type: string, enum: [optimal, moderate, elevated, critical] }
+        annualThroughputMTeu: { type: number }
+        dailyThroughputTeu: { type: integer }
+        customsChannel: { type: string }
+        linkedCorridorId: { type: string }
+        disruptionImpact: { type: ["string", "null"] }
+
+    CorridorStatusDto:
+      type: object
+      properties:
+        corridorId: { type: string }
+        code: { type: string }
+        originCode: { type: string }
+        destCode: { type: string }
+        baseOceanDays: { type: integer }
+        effectiveOceanDays: { type: number }
+        seaAirHubCode: { type: string }
+        effectiveSeaAirDays: { type: number }
+        status: { type: string }
+        capeRerouteActive: { type: boolean }
+
+    CorridorsPortsTelemetryResponse:
+      type: object
+      properties:
+        activeDisruptions:
+          type: array
+          items: { type: string }
+        capeRerouteActive: { type: boolean }
+        congestedPortCount: { type: integer }
+        totalDailyTeuAtRisk: { type: integer }
+        advisory: { type: string }
+        ports:
+          type: array
+          items:
+            $ref: "#/components/schemas/PortTelemetryDto"
+        corridors:
+          type: array
+          items:
+            $ref: "#/components/schemas/CorridorStatusDto"

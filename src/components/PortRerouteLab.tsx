@@ -32,6 +32,9 @@ export interface PortRerouteLabProps {
   t: I18nDict;
   lang: Lang;
   currency: Currency;
+  activeDisruptions: DisruptionScenarioId[];
+  onToggleDisruption: (id: DisruptionScenarioId) => void;
+  onSetDisruptions: (ids: DisruptionScenarioId[]) => void;
   onApplyRerouteToQuote: (payload: {
     corridorId: string;
     mode: TransportMode;
@@ -55,6 +58,9 @@ export function PortRerouteLab({
   t,
   lang,
   currency,
+  activeDisruptions,
+  onToggleDisruption,
+  onSetDisruptions,
   onApplyRerouteToQuote,
 }: PortRerouteLabProps) {
   const [corridorId, setCorridorId] = useState<string>('vn-eu-sea');
@@ -62,9 +68,6 @@ export function PortRerouteLab({
   const [cargoVolumeCbm, setCargoVolumeCbm] = useState<number>(22);
   const [cargoValueUsd, setCargoValueUsd] = useState<number>(180000);
   const [slaDeadlineDays, setSlaDeadlineDays] = useState<number>(24);
-  const [activeDisruptions, setActiveDisruptions] = useState<
-    DisruptionScenarioId[]
-  >(['red-sea-suez']);
 
   const simulation = useMemo(
     () =>
@@ -87,9 +90,7 @@ export function PortRerouteLab({
   );
 
   const toggleDisruption = (id: DisruptionScenarioId) => {
-    setActiveDisruptions((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
-    );
+    onToggleDisruption(id);
   };
 
   const applyProfile = (profileId: string) => {
@@ -101,9 +102,9 @@ export function PortRerouteLab({
     setCargoValueUsd(profile.cargoValueUsd);
     setSlaDeadlineDays(profile.slaDeadlineDays);
     if (profile.corridorId === 'vn-us-sea') {
-      setActiveDisruptions(['uswc-port-strike', 'cat-lai-congestion']);
+      onSetDisruptions(['uswc-port-strike', 'cat-lai-congestion']);
     } else {
-      setActiveDisruptions(['red-sea-suez', 'cat-lai-congestion']);
+      onSetDisruptions(['red-sea-suez', 'cat-lai-congestion']);
     }
   };
 
@@ -189,7 +190,7 @@ export function PortRerouteLab({
             {activeDisruptions.length > 0 && (
               <button
                 type="button"
-                onClick={() => setActiveDisruptions([])}
+                onClick={() => onSetDisruptions([])}
                 data-testid="clear-disruptions-btn"
                 className="font-mono-tech cursor-pointer rounded-md border border-[var(--border-strong)] bg-[var(--bg-elevated)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text-muted)] transition-colors hover:border-[var(--accent-cyan)] hover:text-[var(--text)]"
               >

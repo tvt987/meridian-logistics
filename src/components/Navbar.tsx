@@ -39,6 +39,7 @@ export function Navbar({
   const navLinks = [
     { href: '#control-map', label: t.navMap },
     { href: '#reroute-lab', label: t.navReroute },
+    { href: '#incoterms-lab', label: t.navIncoterms },
     { href: '#container-optimizer', label: t.navContainer },
     { href: '#customs-duty', label: t.navCustoms },
     { href: '#quote-engine', label: t.navQuote },
@@ -47,8 +48,8 @@ export function Navbar({
   ];
 
   return (
-    <header className="no-print sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--bg)]/90 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+    <header className="no-print sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--bg-elevated)]/95 backdrop-blur-md">
+      <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between gap-2.5 px-4 sm:px-6 lg:px-8">
         {/* Brand */}
         <a
           href="#control-map"
@@ -59,7 +60,7 @@ export function Navbar({
             <div className="whitespace-nowrap text-base font-extrabold tracking-tight text-[var(--text)]">
               {t.brand}
             </div>
-            <div className="mt-0.5 whitespace-nowrap text-[9px] font-semibold tracking-[0.06em] text-[var(--accent-cyan)] sm:text-[10px] sm:tracking-[0.12em]">
+            <div className="mt-0.5 whitespace-nowrap text-[9px] font-bold tracking-[0.08em] text-[var(--accent-cyan)] sm:text-[10px] sm:tracking-[0.12em]">
               {t.brandSub}
             </div>
           </div>
@@ -74,7 +75,7 @@ export function Navbar({
             <a
               key={item.href}
               href={item.href}
-              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-semibold text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--text)] xl:text-[13px]"
+              className="inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1.5 text-[12px] font-semibold text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--text)]"
             >
               <span>{item.label}</span>
               {'badge' in item && item.badge !== undefined && item.badge > 0 && (
@@ -87,9 +88,9 @@ export function Navbar({
         </nav>
 
         {/* Right Controls */}
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           {/* Live UTC Clock */}
-          <div className="font-mono-tech hidden items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] px-2.5 py-1 text-xs text-[var(--text-muted)] 2xl:flex">
+          <div className="font-mono-tech hidden items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--bg)] px-2.5 py-1 text-[11px] font-medium text-[var(--text-muted)] 2xl:flex">
             <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent-emerald)]" />
             <span>UTC {utcTime}</span>
           </div>
@@ -98,7 +99,7 @@ export function Navbar({
           <div
             role="group"
             aria-label="Currency selector"
-            className="hidden items-center rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] p-0.5 sm:flex"
+            className="hidden items-center rounded-md border border-[var(--border)] bg-[var(--bg)] p-0.5 sm:flex"
           >
             {(['USD', 'VND'] as Currency[]).map((cur) => (
               <button
@@ -121,7 +122,7 @@ export function Navbar({
           <div
             role="group"
             aria-label="Language selector"
-            className="flex items-center rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] p-0.5"
+            className="flex items-center rounded-md border border-[var(--border)] bg-[var(--bg)] p-0.5"
           >
             {(['vi', 'en'] as Lang[]).map((code) => (
               <button
@@ -131,7 +132,7 @@ export function Navbar({
                 data-testid={`lang-${code}`}
                 className={`font-mono-tech cursor-pointer rounded px-2 py-1 text-[11px] font-semibold uppercase transition-colors ${
                   lang === code
-                    ? 'bg-[var(--accent-amber)] text-[#080c12]'
+                    ? 'bg-[var(--accent-amber)] text-white'
                     : 'text-[var(--text-muted)] hover:text-[var(--text)]'
                 }`}
               >
@@ -140,25 +141,35 @@ export function Navbar({
             ))}
           </div>
 
-          {/* Theme Toggle */}
+          {/* Maritime Daylight / Night-Watch Theme Toggle */}
           <button
             type="button"
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            aria-label="Toggle color theme"
+            onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+            aria-label={
+              theme === 'light'
+                ? 'Switch to Night-Watch dark mode'
+                : 'Switch to Maritime Daylight mode'
+            }
+            title={
+              theme === 'light' ? t.themeNightWatch : t.themeDaylight
+            }
             data-testid="theme-toggle"
-            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-muted)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text)]"
+            className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--bg)] px-2 text-[11px] font-semibold text-[var(--text-muted)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text)]"
           >
             {theme === 'dark' ? (
-              <SunIcon className="h-4 w-4" />
+              <SunIcon className="h-3.5 w-3.5 text-[var(--accent-amber)]" />
             ) : (
-              <MoonIcon className="h-4 w-4" />
+              <MoonIcon className="h-3.5 w-3.5 text-[var(--accent-navy)]" />
             )}
+            <span className="hidden 2xl:inline">
+              {theme === 'light' ? t.themeNightWatch : t.themeDaylight}
+            </span>
           </button>
 
           {/* Primary CTA */}
           <a
             href="#quote-engine"
-            className="hidden rounded-md bg-[var(--accent-cyan)] px-3.5 py-1.5 text-xs font-semibold tracking-wide text-white transition-opacity hover:opacity-90 md:inline-flex"
+            className="hidden whitespace-nowrap rounded-md bg-[var(--bg-navy)] px-3 py-1.5 text-xs font-semibold tracking-wide text-white transition-opacity hover:opacity-90 md:inline-flex"
           >
             {t.instantQuoteCta}
           </a>
@@ -168,7 +179,7 @@ export function Navbar({
             type="button"
             onClick={() => setMobileOpen((v) => !v)}
             aria-label="Toggle navigation menu"
-            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text)] lg:hidden"
+            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-[var(--border)] bg-[var(--bg)] text-[var(--text)] lg:hidden"
           >
             {mobileOpen ? (
               <CloseIcon className="h-4 w-4" />
@@ -188,9 +199,14 @@ export function Navbar({
                 key={item.href}
                 href={item.href}
                 onClick={() => setMobileOpen(false)}
-                className="rounded-md px-3 py-2 text-sm font-medium text-[var(--text)] hover:bg-[var(--bg-subtle)]"
+                className="flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium text-[var(--text)] hover:bg-[var(--bg-subtle)]"
               >
-                {item.label}
+                <span>{item.label}</span>
+                {'badge' in item && item.badge !== undefined && item.badge > 0 && (
+                  <span className="font-mono-tech rounded-full bg-[var(--accent-rose)] px-1.5 py-0.5 text-[10px] font-bold text-white">
+                    {item.badge}
+                  </span>
+                )}
               </a>
             ))}
           </div>

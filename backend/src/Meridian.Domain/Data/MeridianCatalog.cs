@@ -168,4 +168,16 @@ public static class MeridianCatalog
             ["CPTPP"] = "CPTPP Origin Cert",
             ["ACFTA"] = "C/O Form E (ASEAN-China)"
         };
+
+    public static readonly IReadOnlyList<GlobalPortSpec> Ports =
+    [
+        new("VNSGN", "Cat Lai HCMC", "Cat Lai Port, HCMC", "Vietnam", "Southeast Asia Export Gateway", "sea", 14, 74, 6.8m, 18630, "GREEN", "vn-eu-sea"),
+        new("VNHPH", "Hai Phong", "Lach Huyen Deepwater, Hai Phong", "Vietnam", "Northern Vietnam Gateway", "sea", 11, 66, 2.4m, 6575, "GREEN", "vn-us-sea"),
+        new("SGSIN", "Singapore SIN", "PSA Tuas & Changi Air Hub (SIN)", "Singapore", "Malacca Strait Transshipment Hub", "multimodal", 9, 71, 39.0m, 106850, "GREEN", "vn-us-sea"),
+        new("AEDXB", "Dubai DXB", "Jebel Ali Port & Dubai Air Cargo (DXB)", "United Arab Emirates", "Middle East Sea-Air Bridge", "multimodal", 8, 64, 14.5m, 39725, "GREEN", "vn-eu-sea"),
+        new("EGSUZ", "Suez Canal", "Suez Canal Maritime Chokepoint", "Egypt", "Red Sea / Mediterranean Transit", "chokepoint", 16, 69, 22.4m, 61370, "TRANSIT", "vn-eu-sea"),
+        new("ZACPT", "Cape of Good Hope", "Cape of Good Hope Diversion Corridor", "South Africa", "South Atlantic Reroute Waypoint", "chokepoint", 6, 48, 1.4m, 3835, "TRANSIT", "vn-eu-sea"),
+        new("NLRTM", "Rotterdam RTM", "Port of Rotterdam (Maasvlakte II)", "Netherlands", "European Union Gateway", "sea", 16, 76, 13.8m, 37810, "GREEN", "vn-eu-sea"),
+        new("USLAX", "Los Angeles LAX", "Port of Los Angeles (Pier 400)", "United States", "US West Coast Trans-Pacific Gateway", "sea", 22, 81, 9.9m, 27125, "AMBER", "vn-us-sea")
+    ];
 }

@@ -1,12 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { ControlTowerHero } from './components/ControlTowerHero';
-import { CustomsDutyCalculator } from './components/CustomsDutyCalculator';
-import { ExceptionControlTower } from './components/ExceptionControlTower';
 import { Footer } from './components/Footer';
-import { FreightQuoteEngine } from './components/FreightQuoteEngine';
 import { Navbar } from './components/Navbar';
-import { PortIntelligenceSection } from './components/PortIntelligenceSection';
-import { WaybillTrackerSection } from './components/WaybillTrackerSection';
 import { SHIPPING_CORRIDORS } from './data/corridors';
 import { I18N } from './data/i18n';
 import {
@@ -40,6 +35,7 @@ import type {
   ContainerTypeId,
   Currency,
   CustomsDutyInput,
+  DisruptionScenarioId,
   ExceptionAlert,
   FreightQuoteInput,
   Lang,
@@ -51,7 +47,33 @@ import type {
 } from './types/logistics';
 
 const PortRerouteLab = lazy(() => import('./components/PortRerouteLab'));
+const IncotermsChainLab = lazy(() => import('./components/IncotermsChainLab'));
 const Container3DPacker = lazy(() => import('./components/Container3DPacker'));
+const CustomsDutyCalculator = lazy(() =>
+  import('./components/CustomsDutyCalculator').then((m) => ({
+    default: m.CustomsDutyCalculator,
+  })),
+);
+const FreightQuoteEngine = lazy(() =>
+  import('./components/FreightQuoteEngine').then((m) => ({
+    default: m.FreightQuoteEngine,
+  })),
+);
+const WaybillTrackerSection = lazy(() =>
+  import('./components/WaybillTrackerSection').then((m) => ({
+    default: m.WaybillTrackerSection,
+  })),
+);
+const ExceptionControlTower = lazy(() =>
+  import('./components/ExceptionControlTower').then((m) => ({
+    default: m.ExceptionControlTower,
+  })),
+);
+const PortIntelligenceSection = lazy(() =>
+  import('./components/PortIntelligenceSection').then((m) => ({
+    default: m.PortIntelligenceSection,
+  })),
+);
 const TradeDocStudio = lazy(() => import('./components/TradeDocStudio'));
 
 function SectionLoadingSkeleton({ label }: { label: string }) {
@@ -61,7 +83,7 @@ function SectionLoadingSkeleton({ label }: { label: string }) {
       className="no-print border-b border-[var(--border)] py-12"
     >
       <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8">
-        <div className="panel-card flex h-44 items-center justify-center rounded-xl">
+        <div className="panel-card flex h-40 items-center justify-center rounded-xl">
           <span className="font-mono-tech text-xs font-semibold uppercase tracking-widest text-[var(--text-muted)]">
             {label}
           </span>
@@ -73,12 +95,17 @@ function SectionLoadingSkeleton({ label }: { label: string }) {
 
 export function App() {
   const [lang, setLang] = useState<Lang>('en');
-  const [theme, setTheme] = useState<Theme>('dark');
+  const [theme, setTheme] = useState<Theme>('light');
   const [currency, setCurrency] = useState<Currency>('USD');
 
   const [selectedCorridorId, setSelectedCorridorId] = useState<string>(
     SHIPPING_CORRIDORS[0].id,
   );
+
+  // Synchronized global disruption toggles shared by Hero GlobalCorridorMap & PortRerouteLab
+  const [activeDisruptions, setActiveDisruptions] = useState<
+    DisruptionScenarioId[]
+  >(['red-sea-suez']);
 
   // Container Load & Carton Stuffing Optimizer State
   const [containerType, setContainerType] = useState<ContainerTypeId>(
@@ -163,6 +190,12 @@ export function App() {
   const activePrintWaybill = useMemo(() => {
     return waybills.find((w) => w.id === activeWaybillId) ?? waybills[0];
   }, [waybills, activeWaybillId]);
+
+  const handleToggleDisruption = (id: DisruptionScenarioId) => {
+    setActiveDisruptions((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  };
 
   const handleLoadCorridorToQuote = (corridor: ShippingCorridor) => {
     setQuoteInput((prev) => ({
@@ -317,9 +350,11 @@ export function App() {
           t={t}
           lang={lang}
           selectedCorridorId={selectedCorridorId}
+          activeDisruptions={activeDisruptions}
           openAlertsCount={alertCounts.totalActive}
           criticalAlertsCount={alertCounts.critical}
           onSelectCorridor={setSelectedCorridorId}
+          onToggleDisruption={handleToggleDisruption}
           onLoadCorridorToQuote={handleLoadCorridorToQuote}
         />
 
@@ -332,7 +367,26 @@ export function App() {
             t={t}
             lang={lang}
             currency={currency}
+            activeDisruptions={activeDisruptions}
+            onToggleDisruption={handleToggleDisruption}
+            onSetDisruptions={setActiveDisruptions}
             onApplyRerouteToQuote={handleApplyRerouteToQuote}
+          />
+        </Suspense>
+
+        <Suspense
+          fallback={
+            <SectionLoadingSkeleton label="Loading Incoterms 2020 Cost & Risk Transfer Visualizer..." />
+          }
+        >
+          <IncotermsChainLab
+            t={t}
+            lang={lang}
+            currency={currency}
+            currentQuoteFreightUsd={
+              liveQuoteResult.baseFreightUsd + liveQuoteResult.fuelSurchargeUsd
+            }
+            currentQuoteDeclaredUsd={quoteInput.declaredValueUsd}
           />
         </Suspense>
 
@@ -357,56 +411,86 @@ export function App() {
           />
         </Suspense>
 
-        <CustomsDutyCalculator
-          t={t}
-          lang={lang}
-          currency={currency}
-          dutyInput={dutyInput}
-          setDutyInput={setDutyInput}
-          currentQuoteFreightUsd={
-            liveQuoteResult.baseFreightUsd + liveQuoteResult.fuelSurchargeUsd
+        <Suspense
+          fallback={
+            <SectionLoadingSkeleton label="Loading Vietnam HS/FTA Customs Engine..." />
           }
-          currentQuoteInsuranceUsd={liveQuoteResult.insuranceUsd}
-          currentQuoteDeclaredUsd={quoteInput.declaredValueUsd}
-        />
+        >
+          <CustomsDutyCalculator
+            t={t}
+            lang={lang}
+            currency={currency}
+            dutyInput={dutyInput}
+            setDutyInput={setDutyInput}
+            currentQuoteFreightUsd={
+              liveQuoteResult.baseFreightUsd + liveQuoteResult.fuelSurchargeUsd
+            }
+            currentQuoteInsuranceUsd={liveQuoteResult.insuranceUsd}
+            currentQuoteDeclaredUsd={quoteInput.declaredValueUsd}
+          />
+        </Suspense>
 
-        <FreightQuoteEngine
-          t={t}
-          lang={lang}
-          currency={currency}
-          quoteInput={quoteInput}
-          setQuoteInput={setQuoteInput}
-          onCreateBooking={handleCreateBooking}
-          onTrackWaybill={handleTrackWaybill}
-          onPreviewBl={(wb) => handleOpenPrintDoc(wb, 'bl')}
-        />
+        <Suspense
+          fallback={
+            <SectionLoadingSkeleton label="Loading Multimodal Freight Quote Engine..." />
+          }
+        >
+          <FreightQuoteEngine
+            t={t}
+            lang={lang}
+            currency={currency}
+            quoteInput={quoteInput}
+            setQuoteInput={setQuoteInput}
+            onCreateBooking={handleCreateBooking}
+            onTrackWaybill={handleTrackWaybill}
+            onPreviewBl={(wb) => handleOpenPrintDoc(wb, 'bl')}
+          />
+        </Suspense>
 
-        <WaybillTrackerSection
-          t={t}
-          lang={lang}
-          currency={currency}
-          waybills={waybills}
-          activeWaybillId={activeWaybillId}
-          onSelectWaybill={setActiveWaybillId}
-          onPreviewDoc={handleOpenPrintDoc}
-          onAdvanceStage={handleAdvanceStage}
-          onDeleteUserWaybill={handleDeleteUserWaybill}
-        />
+        <Suspense
+          fallback={
+            <SectionLoadingSkeleton label="Loading Persistent Waybill Vault..." />
+          }
+        >
+          <WaybillTrackerSection
+            t={t}
+            lang={lang}
+            currency={currency}
+            waybills={waybills}
+            activeWaybillId={activeWaybillId}
+            onSelectWaybill={setActiveWaybillId}
+            onPreviewDoc={handleOpenPrintDoc}
+            onAdvanceStage={handleAdvanceStage}
+            onDeleteUserWaybill={handleDeleteUserWaybill}
+          />
+        </Suspense>
 
-        <ExceptionControlTower
-          t={t}
-          lang={lang}
-          alerts={alerts}
-          onUpdateStatus={handleUpdateAlertStatus}
-          onSimulateAlert={handleSimulateAlert}
-          onInspectWaybill={handleTrackWaybill}
-        />
+        <Suspense
+          fallback={
+            <SectionLoadingSkeleton label="Loading Exception Control Tower..." />
+          }
+        >
+          <ExceptionControlTower
+            t={t}
+            lang={lang}
+            alerts={alerts}
+            onUpdateStatus={handleUpdateAlertStatus}
+            onSimulateAlert={handleSimulateAlert}
+            onInspectWaybill={handleTrackWaybill}
+          />
+        </Suspense>
 
-        <PortIntelligenceSection
-          t={t}
-          lang={lang}
-          onFocusCorridor={handleFocusCorridorFromPorts}
-        />
+        <Suspense
+          fallback={
+            <SectionLoadingSkeleton label="Loading Global Port Intelligence..." />
+          }
+        >
+          <PortIntelligenceSection
+            t={t}
+            lang={lang}
+            onFocusCorridor={handleFocusCorridorFromPorts}
+          />
+        </Suspense>
       </main>
 
       <Footer t={t} />

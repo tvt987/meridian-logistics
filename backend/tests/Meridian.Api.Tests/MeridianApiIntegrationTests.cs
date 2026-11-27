@@ -32,9 +32,11 @@ public sealed class MeridianApiIntegrationTests : IClassFixture<WebApplicationFa
 
         using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         Assert.Equal("healthy", doc.RootElement.GetProperty("status").GetString());
-        Assert.Equal("3.0.0", doc.RootElement.GetProperty("version").GetString());
+        Assert.Equal("4.0.0", doc.RootElement.GetProperty("version").GetString());
         Assert.Equal(4, doc.RootElement.GetProperty("corridorsLoaded").GetInt32());
+        Assert.Equal(8, doc.RootElement.GetProperty("portsLoaded").GetInt32());
         Assert.Equal(6, doc.RootElement.GetProperty("hsPresetsLoaded").GetInt32());
+        Assert.Equal(7, doc.RootElement.GetProperty("incotermsSupported").GetInt32());
     }
 
     /* ========================================================================
@@ -488,5 +490,237 @@ public sealed class MeridianApiIntegrationTests : IClassFixture<WebApplicationFa
         var req = new CorridorRerouteRequest("vn-eu-sea", -100, 10, 50000, 20, []);
         var response = await _client.PostAsJsonAsync("/api/v1/corridors/reroute", req);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    /* ========================================================================
+     * 6. INCOTERMS 2020 COST & RISK ALLOCATOR (/api/v1/incoterms/allocate)
+     * ======================================================================== */
+
+    [Fact]
+    public async Task IncotermsAllocate_Exw_AssignsOnlyStage1ToSellerAndBuyerCoversRemaining7Stages()
+    {
+        var req = new IncotermsAllocateRequest("EXW", 120000m);
+        var response = await _client.PostAsJsonAsync("/api/v1/incoterms/allocate", req);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var res = await response.Content.ReadFromJsonAsync<IncotermsAllocateResponse>(JsonOpts);
+        Assert.NotNull(res);
+        Assert.Equal("EXW", res.Incoterm);
+        Assert.Equal("E", res.GroupCode);
+        Assert.Equal(1, res.RiskTransferStageIndex);
+        Assert.Equal(1, res.CostTransferStageIndex);
+        Assert.False(res.HasCostRiskSplit);
+        Assert.False(res.InsuranceRequired);
+        Assert.Equal(8, res.Stages.Count);
+        Assert.Single(res.Stages, s => s.CostOwner == "seller");
+        Assert.Equal(7, res.Stages.Count(s => s.CostOwner == "buyer"));
+    }
+
+    [Fact]
+    public async Task IncotermsAllocate_Fca_CoversExportCustomsAndSupportsAnyTransportMode()
+    {
+        var req = new IncotermsAllocateRequest("FCA", 120000m);
+        var response = await _client.PostAsJsonAsync("/api/v1/incoterms/allocate", req);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var res = await response.Content.ReadFromJsonAsync<IncotermsAllocateResponse>(JsonOpts);
+        Assert.NotNull(res);
+        Assert.False(res.SeaOnly);
+        Assert.Equal(3, res.RiskTransferStageIndex);
+        Assert.Equal(3, res.Stages.Count(s => s.CostOwner == "seller"));
+        Assert.Equal(3, res.Stages.Count(s => s.RiskOwner == "seller"));
+    }
+
+    [Fact]
+    public async Task IncotermsAllocate_Fob_EnforcesSeaOnlyScopeAndTransfersRiskAtPortLoading()
+    {
+        var req = new IncotermsAllocateRequest("FOB", 120000m);
+        var response = await _client.PostAsJsonAsync("/api/v1/incoterms/allocate", req);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var res = await response.Content.ReadFromJsonAsync<IncotermsAllocateResponse>(JsonOpts);
+        Assert.NotNull(res);
+        Assert.True(res.SeaOnly);
+        Assert.Equal(4, res.RiskTransferStageIndex);
+        Assert.Equal(4, res.CostTransferStageIndex);
+        Assert.False(res.HasCostRiskSplit);
+        Assert.Equal("seller", res.Stages[3].CostOwner);
+        Assert.Equal("buyer", res.Stages[4].CostOwner);
+    }
+
+    [Fact]
+    public async Task IncotermsAllocate_Cfr_DetectsCostRiskSplitPointWithoutMandatoryInsurance()
+    {
+        var req = new IncotermsAllocateRequest("CFR", 120000m);
+        var response = await _client.PostAsJsonAsync("/api/v1/incoterms/allocate", req);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var res = await response.Content.ReadFromJsonAsync<IncotermsAllocateResponse>(JsonOpts);
+        Assert.NotNull(res);
+        Assert.Equal("C", res.GroupCode);
+        Assert.True(res.HasCostRiskSplit);
+        Assert.Equal(4, res.RiskTransferStageIndex);
+        Assert.Equal(5, res.CostTransferStageIndex);
+        Assert.False(res.InsuranceRequired);
+        Assert.Equal("seller", res.Stages[4].CostOwner);
+        Assert.Equal("buyer", res.Stages[4].RiskOwner);
+    }
+
+    [Fact]
+    public async Task IncotermsAllocate_Cif_RequiresMandatoryInsuranceAndSplitsRiskAtStage4CostAtStage6()
+    {
+        var req = new IncotermsAllocateRequest("CIF", 120000m);
+        var response = await _client.PostAsJsonAsync("/api/v1/incoterms/allocate", req);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var res = await response.Content.ReadFromJsonAsync<IncotermsAllocateResponse>(JsonOpts);
+        Assert.NotNull(res);
+        Assert.True(res.HasCostRiskSplit);
+        Assert.True(res.InsuranceRequired);
+        Assert.Equal(4, res.RiskTransferStageIndex);
+        Assert.Equal(6, res.CostTransferStageIndex);
+        Assert.Contains("ICC (C)", res.InsuranceCoverageStandard);
+        Assert.Equal("seller", res.Stages[5].CostOwner);
+        Assert.Equal("buyer", res.Stages[5].RiskOwner);
+    }
+
+    [Fact]
+    public async Task IncotermsAllocate_Dap_LeavesImportCustomsAndDutyWithBuyerWhileSellerDeliversToWarehouse()
+    {
+        var req = new IncotermsAllocateRequest("DAP", 120000m, ImportDutyRatePct: 10m);
+        var response = await _client.PostAsJsonAsync("/api/v1/incoterms/allocate", req);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var res = await response.Content.ReadFromJsonAsync<IncotermsAllocateResponse>(JsonOpts);
+        Assert.NotNull(res);
+        Assert.Equal("buyer", res.Stages[6].CostOwner);
+        Assert.Equal("buyer", res.Stages[6].RiskOwner);
+        Assert.Equal("seller", res.Stages[7].CostOwner);
+        Assert.Equal("seller", res.Stages[7].RiskOwner);
+        Assert.Equal(res.Stages[6].CostUsd, res.BuyerCostUsd);
+    }
+
+    [Fact]
+    public async Task IncotermsAllocate_Ddp_Allocates100PercentToSellerWithZeroBuyerCost()
+    {
+        var req = new IncotermsAllocateRequest("DDP", 120000m);
+        var response = await _client.PostAsJsonAsync("/api/v1/incoterms/allocate", req);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var res = await response.Content.ReadFromJsonAsync<IncotermsAllocateResponse>(JsonOpts);
+        Assert.NotNull(res);
+        Assert.Equal(100m, res.SellerSharePct);
+        Assert.Equal(0m, res.BuyerSharePct);
+        Assert.Equal(0m, res.BuyerCostUsd);
+        Assert.Equal(res.TotalLogisticsCostUsd, res.SellerCostUsd);
+        Assert.Equal(res.BuyerTotalOutlayUsd, res.SellerTotalContractUsd);
+    }
+
+    [Fact]
+    public async Task IncotermsAllocate_AccountingInvariant_TotalLogisticsCostRemainsConstantAcrossAll7Rules()
+    {
+        string[] orderedTerms = ["EXW", "FCA", "FOB", "CFR", "CIF", "DAP", "DDP"];
+        decimal? expectedTotal = null;
+        decimal prevSeller = -1m;
+
+        foreach (var term in orderedTerms)
+        {
+            var req = new IncotermsAllocateRequest(term, 100000m);
+            var response = await _client.PostAsJsonAsync("/api/v1/incoterms/allocate", req);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+            var res = await response.Content.ReadFromJsonAsync<IncotermsAllocateResponse>(JsonOpts);
+            Assert.NotNull(res);
+            Assert.Equal(res.TotalLogisticsCostUsd, res.SellerCostUsd + res.BuyerCostUsd);
+            Assert.Equal(100m, res.SellerSharePct + res.BuyerSharePct);
+            Assert.True(res.SellerCostUsd > prevSeller);
+            prevSeller = res.SellerCostUsd;
+
+            expectedTotal ??= res.TotalLogisticsCostUsd;
+            Assert.Equal(expectedTotal.Value, res.TotalLogisticsCostUsd);
+        }
+    }
+
+    [Fact]
+    public async Task IncotermsAllocate_InvalidTermOrNegativeCargoValue_Returns400ValidationProblem()
+    {
+        var badTermReq = new IncotermsAllocateRequest("INVALID", 50000m);
+        var badTermResp = await _client.PostAsJsonAsync("/api/v1/incoterms/allocate", badTermReq);
+        Assert.Equal(HttpStatusCode.BadRequest, badTermResp.StatusCode);
+
+        var badValueReq = new IncotermsAllocateRequest("CIF", -100m);
+        var badValueResp = await _client.PostAsJsonAsync("/api/v1/incoterms/allocate", badValueReq);
+        Assert.Equal(HttpStatusCode.BadRequest, badValueResp.StatusCode);
+    }
+
+    /* ========================================================================
+     * 7. GLOBAL PORT CONGESTION & CORRIDOR STATUS (/api/v1/corridors/ports)
+     * ======================================================================== */
+
+    [Fact]
+    public async Task CorridorsPorts_NominalBaseline_ReturnsAll8GlobalPortsAnd4Corridors()
+    {
+        var response = await _client.GetAsync("/api/v1/corridors/ports");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var res = await response.Content.ReadFromJsonAsync<CorridorsPortsTelemetryResponse>(JsonOpts);
+        Assert.NotNull(res);
+        Assert.False(res.CapeRerouteActive);
+        Assert.Empty(res.ActiveDisruptions);
+        Assert.Equal(8, res.Ports.Count);
+        Assert.Equal(4, res.Corridors.Count);
+        Assert.Equal(0, res.TotalDailyTeuAtRisk);
+        Assert.Contains(res.Ports, p => p.Code == "VNSGN");
+        Assert.Contains(res.Ports, p => p.Code == "SGSIN");
+        Assert.Contains(res.Ports, p => p.Code == "AEDXB");
+        Assert.Contains(res.Ports, p => p.Code == "EGSUZ");
+        Assert.Contains(res.Ports, p => p.Code == "ZACPT");
+        Assert.Contains(res.Ports, p => p.Code == "NLRTM");
+        Assert.Contains(res.Ports, p => p.Code == "USLAX");
+    }
+
+    [Fact]
+    public async Task CorridorsPorts_RedSeaDisruptionQuery_ActivatesCapeRerouteAndSpikesSuezAndCapeDwell()
+    {
+        var response = await _client.GetAsync("/api/v1/corridors/ports?disruptions=red-sea-suez");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var res = await response.Content.ReadFromJsonAsync<CorridorsPortsTelemetryResponse>(JsonOpts);
+        Assert.NotNull(res);
+        Assert.True(res.CapeRerouteActive);
+        Assert.Contains("red-sea-suez", res.ActiveDisruptions);
+
+        var suez = res.Ports.Single(p => p.Code == "EGSUZ");
+        var cape = res.Ports.Single(p => p.Code == "ZACPT");
+        var euCorridor = res.Corridors.Single(c => c.CorridorId == "vn-eu-sea");
+
+        Assert.Equal("critical", suez.Status);
+        Assert.Equal(suez.BaseDwellHours + 288, suez.EffectiveDwellHours);
+        Assert.True(cape.DisruptionDeltaHours > 0);
+        Assert.True(euCorridor.CapeRerouteActive);
+        Assert.Equal("rerouted-cape", euCorridor.Status);
+        Assert.Equal(40m, euCorridor.EffectiveOceanDays);
+    }
+
+    [Fact]
+    public async Task CorridorsPorts_CatLaiAndUswcDisruptions_SpikesVnsgnAndUslaxDwellAndTeuAtRisk()
+    {
+        var response = await _client.GetAsync("/api/v1/corridors/ports?disruptions=cat-lai-congestion,uswc-port-strike");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var res = await response.Content.ReadFromJsonAsync<CorridorsPortsTelemetryResponse>(JsonOpts);
+        Assert.NotNull(res);
+        Assert.Equal(2, res.ActiveDisruptions.Count);
+        Assert.True(res.TotalDailyTeuAtRisk > 150000);
+
+        var catLai = res.Ports.Single(p => p.Code == "VNSGN");
+        var lax = res.Ports.Single(p => p.Code == "USLAX");
+        var usCorridor = res.Corridors.Single(c => c.CorridorId == "vn-us-sea");
+
+        Assert.Equal("critical", catLai.Status);
+        Assert.Equal(catLai.BaseDwellHours + 96, catLai.EffectiveDwellHours);
+        Assert.Equal("critical", lax.Status);
+        Assert.Equal(lax.BaseDwellHours + 216, lax.EffectiveDwellHours);
+        Assert.Equal(33m, usCorridor.EffectiveOceanDays); // 20 base + 9 USWC + 4 Cat Lai
     }
 }

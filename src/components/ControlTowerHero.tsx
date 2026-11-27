@@ -1,16 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  PORT_HUBS,
-  SHIPPING_CORRIDORS,
-  WORLD_CONTINENT_PATHS,
-} from '../data/corridors';
+import { SHIPPING_CORRIDORS } from '../data/corridors';
 import type { I18nDict } from '../data/i18n';
 import { formatCountdown } from '../engines/freight';
-import type { CongestionLevel, Lang, ShippingCorridor } from '../types/logistics';
+import { buildGlobalMapState } from '../engines/maritimeMapEngine';
+import type {
+  DisruptionScenarioId,
+  GlobalPortNode,
+  GlobalSeaLane,
+  Lang,
+  PortStatusLevel,
+  ShippingCorridor,
+} from '../types/logistics';
+import { GlobalCorridorMap, type MapLaneFilter } from './GlobalCorridorMap';
 import {
   ActivityIcon,
+  AlertTriangleIcon,
   AnchorIcon,
   ArrowRightIcon,
+  CompassIcon,
   DropletIcon,
   PlaneIcon,
   ShieldCheckIcon,
@@ -22,49 +29,70 @@ interface ControlTowerHeroProps {
   t: I18nDict;
   lang: Lang;
   selectedCorridorId: string;
+  activeDisruptions: DisruptionScenarioId[];
   openAlertsCount: number;
   criticalAlertsCount: number;
   onSelectCorridor: (corridorId: string) => void;
+  onToggleDisruption: (id: DisruptionScenarioId) => void;
   onLoadCorridorToQuote: (corridor: ShippingCorridor) => void;
 }
 
-const LABEL_OFFSETS: Record<
-  string,
-  { dx: number; dy: number; anchor: 'start' | 'end' }
-> = {
-  VNHPH: { dx: 10, dy: -6, anchor: 'start' },
-  VNDAD: { dx: 11, dy: 4, anchor: 'start' },
-  SGN: { dx: -10, dy: -3, anchor: 'end' },
-  VNSGN: { dx: 10, dy: 15, anchor: 'start' },
-  NLRTM: { dx: -9, dy: -8, anchor: 'end' },
-  FRA: { dx: 10, dy: 11, anchor: 'start' },
-  JPTYO: { dx: 10, dy: -2, anchor: 'start' },
-  USLAX: { dx: 10, dy: 4, anchor: 'start' },
-};
-
-function congestionBadgeStyle(level: CongestionLevel): string {
-  switch (level) {
-    case 'optimal':
-      return 'bg-[var(--accent-emerald-soft)] text-[var(--accent-emerald)] border-[var(--accent-emerald)]/30';
-    case 'moderate':
-      return 'bg-[var(--accent-amber-soft)] text-[var(--accent-amber)] border-[var(--accent-amber)]/30';
+function statusPillClass(status: PortStatusLevel): string {
+  switch (status) {
+    case 'critical':
+      return 'border-[var(--accent-rose)]/40 bg-[var(--accent-rose-soft)] text-[var(--accent-rose)]';
     case 'elevated':
-      return 'bg-[var(--accent-rose-soft)] text-[var(--accent-rose)] border-[var(--accent-rose)]/30';
+      return 'border-[var(--accent-amber)]/40 bg-[var(--accent-amber-soft)] text-[var(--accent-amber)]';
+    case 'moderate':
+      return 'border-[var(--accent-cyan)]/35 bg-[var(--accent-cyan-soft)] text-[var(--accent-cyan)]';
+    case 'optimal':
+      return 'border-[var(--accent-emerald)]/35 bg-[var(--accent-emerald-soft)] text-[var(--accent-emerald)]';
   }
 }
+
+function statusBarClass(status: PortStatusLevel): string {
+  switch (status) {
+    case 'critical':
+      return 'bg-[var(--accent-rose)]';
+    case 'elevated':
+      return 'bg-[var(--accent-amber)]';
+    case 'moderate':
+      return 'bg-[var(--accent-cyan)]';
+    case 'optimal':
+      return 'bg-[var(--accent-emerald)]';
+  }
+}
+
+const DISRUPTION_CHIPS: {
+  id: DisruptionScenarioId;
+  labelEn: string;
+  labelVi: string;
+}[] = [
+  { id: 'red-sea-suez', labelEn: 'Red Sea Closure', labelVi: 'Biển Đỏ +12d' },
+  {
+    id: 'cat-lai-congestion',
+    labelEn: 'Cat Lai Congestion',
+    labelVi: 'Cát Lái +4d',
+  },
+  { id: 'uswc-port-strike', labelEn: 'USWC Strike', labelVi: 'USWC +9d' },
+];
 
 export function ControlTowerHero({
   t,
   lang,
   selectedCorridorId,
+  activeDisruptions,
   openAlertsCount,
   criticalAlertsCount,
   onSelectCorridor,
+  onToggleDisruption,
   onLoadCorridorToQuote,
 }: ControlTowerHeroProps) {
-  const [modeFilter, setModeFilter] = useState<'all' | 'sea' | 'air'>('all');
+  const [laneFilter, setLaneFilter] = useState<MapLaneFilter>('all');
   const [paused, setPaused] = useState(false);
   const [elapsedSec, setElapsedSec] = useState(0);
+  const [inspectorTab, setInspectorTab] = useState<'corridor' | 'port'>('port');
+  const [selectedPortCode, setSelectedPortCode] = useState<string>('VNSGN');
 
   useEffect(() => {
     if (paused) return;
@@ -74,10 +102,10 @@ export function ControlTowerHero({
     return () => window.clearInterval(id);
   }, [paused]);
 
-  const visibleCorridors = useMemo(() => {
-    if (modeFilter === 'all') return SHIPPING_CORRIDORS;
-    return SHIPPING_CORRIDORS.filter((c) => c.modeGroup === modeFilter);
-  }, [modeFilter]);
+  const mapState = useMemo(
+    () => buildGlobalMapState(activeDisruptions),
+    [activeDisruptions],
+  );
 
   const activeCorridor = useMemo(() => {
     return (
@@ -86,16 +114,13 @@ export function ControlTowerHero({
     );
   }, [selectedCorridorId]);
 
-  const originHub = useMemo(
-    () => PORT_HUBS.find((h) => h.code === activeCorridor.originCode),
-    [activeCorridor.originCode],
-  );
-  const destHub = useMemo(
-    () => PORT_HUBS.find((h) => h.code === activeCorridor.destCode),
-    [activeCorridor.destCode],
-  );
+  const inspectedPort: GlobalPortNode = useMemo(() => {
+    return (
+      mapState.ports.find((p) => p.code === selectedPortCode) ??
+      mapState.ports[0]
+    );
+  }, [mapState.ports, selectedPortCode]);
 
-  // Subtle live temperature micro-drift (+/-0.1C) for telemetry realism
   const liveTempC = useMemo(() => {
     const jitter = ((elapsedSec % 5) - 2) * 0.05;
     return Number((activeCorridor.telemetry.tempC + jitter).toFixed(1));
@@ -115,46 +140,53 @@ export function ControlTowerHero({
       .join(' ');
   }, [activeCorridor.telemetry.tempHistory]);
 
-  const congestionLabel = (level: CongestionLevel) => {
-    if (level === 'optimal') return t.congestionOptimal;
-    if (level === 'moderate') return t.congestionModerate;
-    return t.congestionElevated;
+  const handleSelectPort = (port: GlobalPortNode) => {
+    setSelectedPortCode(port.code);
+    setInspectorTab('port');
+    onSelectCorridor(port.linkedCorridorId);
+  };
+
+  const handleSelectLane = (lane: GlobalSeaLane) => {
+    onSelectCorridor(lane.corridorId);
+    setInspectorTab('corridor');
   };
 
   return (
     <section
       id="control-map"
-      className="no-print maritime-grid-bg relative border-b border-[var(--border)] pt-3.5 pb-7 lg:pt-4 lg:pb-8"
+      className="no-print maritime-grid-bg relative border-b border-[var(--border)] pt-4 pb-8 lg:pt-5 lg:pb-10"
     >
       <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8">
-        {/* Compact Executive Command Header + KPI Strip */}
-        <div className="mb-3.5 grid grid-cols-1 gap-3 lg:grid-cols-12 lg:items-end">
+        {/* Clean Flexport/Maersk Executive Masthead + KPI Strip */}
+        <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-end">
           <div className="lg:col-span-7">
-            <div className="mb-1.5 inline-flex items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] px-2.5 py-1 text-[10px] font-semibold tracking-wider text-[var(--accent-cyan)] sm:text-[11px]">
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-1 text-[10px] font-bold tracking-[0.09em] text-[var(--accent-cyan)] shadow-xs sm:text-[11px]">
               <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--accent-emerald)]" />
-              <span className="leading-snug">{t.heroEyebrow}</span>
+              <span>{t.heroEyebrow}</span>
             </div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-[var(--text)] sm:text-3xl lg:text-[32px] lg:leading-[1.15]">
+            <h1 className="text-2xl font-extrabold tracking-tight text-[var(--text)] sm:text-3xl lg:text-[34px] lg:leading-[1.12]">
               {t.heroTitle}
             </h1>
-            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-[var(--text-muted)] sm:text-sm">
+            <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-[var(--text-muted)] sm:text-sm">
               {t.heroSubtitle}
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:col-span-5">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 lg:col-span-5">
             {[
               {
                 label: t.kpiVessels,
                 value: '18',
-                pill: null as string | null,
+                pill: mapState.capeRerouteActive ? 'CAPE +12d' : null,
+                pillAmber: true,
                 tone: 'text-[var(--accent-cyan)]',
-                href: '#port-intel',
+                href: '#reroute-lab',
               },
               {
                 label: t.kpiTeu,
                 value: '4,280',
                 pill: null as string | null,
+                pillAmber: false,
                 tone: 'text-[var(--text)]',
                 href: '#container-optimizer',
               },
@@ -162,6 +194,7 @@ export function ControlTowerHero({
                 label: t.kpiCustoms,
                 value: '3.4h',
                 pill: null as string | null,
+                pillAmber: false,
                 tone: 'text-[var(--accent-emerald)]',
                 href: '#customs-duty',
               },
@@ -172,6 +205,7 @@ export function ControlTowerHero({
                   criticalAlertsCount > 0
                     ? `${criticalAlertsCount} CRIT`
                     : null,
+                pillAmber: false,
                 tone:
                   criticalAlertsCount > 0
                     ? 'text-[var(--accent-rose)]'
@@ -182,14 +216,22 @@ export function ControlTowerHero({
               <a
                 key={kpi.label}
                 href={kpi.href}
-                className="panel-card rounded-lg px-3 py-2 transition-colors hover:border-[var(--border-strong)]"
+                className="panel-card rounded-xl px-3.5 py-2.5 transition-all hover:border-[var(--accent-cyan)]"
               >
                 <div className="flex items-center justify-between gap-1">
-                  <span className={`font-mono-tech text-lg font-bold ${kpi.tone}`}>
+                  <span
+                    className={`font-mono-tech text-lg font-extrabold ${kpi.tone}`}
+                  >
                     {kpi.value}
                   </span>
                   {kpi.pill && (
-                    <span className="font-mono-tech shrink-0 rounded border border-[var(--accent-rose)]/35 bg-[var(--accent-rose-soft)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--accent-rose)]">
+                    <span
+                      className={`font-mono-tech shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-bold ${
+                        kpi.pillAmber
+                          ? 'border-[var(--accent-amber)]/40 bg-[var(--accent-amber-soft)] text-[var(--accent-amber)]'
+                          : 'border-[var(--accent-rose)]/35 bg-[var(--accent-rose-soft)] text-[var(--accent-rose)]'
+                      }`}
+                    >
                       {kpi.pill}
                     </span>
                   )}
@@ -202,39 +244,31 @@ export function ControlTowerHero({
           </div>
         </div>
 
-        {/* Main Split Control Tower Stage */}
+        {/* Main Split Maritime Control Tower Stage */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-          {/* Interactive World Corridor Map (8 cols) */}
+          {/* Interactive Global Sea-Lane & Air-Corridor World Map (8 cols) */}
           <div className="panel-card flex flex-col overflow-hidden rounded-xl lg:col-span-8">
-            {/* Map HUD Toolbar */}
+            {/* Map Control & Synchronized Disruption Toolbar */}
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--bg-elevated)] px-3.5 py-2.5">
+              {/* Lane Mode Filters */}
               <div className="flex flex-wrap items-center gap-1.5">
                 {(
                   [
                     { id: 'all', label: t.mapFilterAll },
                     { id: 'sea', label: t.mapFilterSea },
+                    { id: 'hybrid', label: t.mapFilterHybrid },
                     { id: 'air', label: t.mapFilterAir },
                   ] as const
                 ).map((tab) => (
                   <button
                     key={tab.id}
                     type="button"
-                    onClick={() => {
-                      setModeFilter(tab.id);
-                      if (
-                        tab.id !== 'all' &&
-                        activeCorridor.modeGroup !== tab.id
-                      ) {
-                        const firstMatch = SHIPPING_CORRIDORS.find(
-                          (c) => c.modeGroup === tab.id,
-                        );
-                        if (firstMatch) onSelectCorridor(firstMatch.id);
-                      }
-                    }}
+                    onClick={() => setLaneFilter(tab.id)}
+                    data-testid={`map-filter-${tab.id}`}
                     className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
-                      modeFilter === tab.id
-                        ? 'bg-[var(--accent-cyan)] text-white'
-                        : 'border border-[var(--border)] bg-[var(--bg-panel)] text-[var(--text-muted)] hover:text-[var(--text)]'
+                      laneFilter === tab.id
+                        ? 'bg-[var(--bg-navy)] text-white'
+                        : 'border border-[var(--border)] bg-[var(--bg)] text-[var(--text-muted)] hover:text-[var(--text)]'
                     }`}
                   >
                     {tab.label}
@@ -242,270 +276,70 @@ export function ControlTowerHero({
                 ))}
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="font-mono-tech hidden text-[11px] text-[var(--text-muted)] sm:inline">
-                  AIS/ADS-B · {activeCorridor.code}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setPaused((p) => !p)}
-                  className="font-mono-tech cursor-pointer rounded-md border border-[var(--border)] bg-[var(--bg-panel)] px-2.5 py-1 text-[11px] font-medium text-[var(--text-muted)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text)]"
-                >
-                  {paused ? t.mapResume : t.mapPause}
-                </button>
-              </div>
+              {/* Pause/Resume Feed */}
+              <button
+                type="button"
+                onClick={() => setPaused((p) => !p)}
+                data-testid="map-pause-btn"
+                className="font-mono-tech cursor-pointer rounded-md border border-[var(--border)] bg-[var(--bg)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text-muted)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text)]"
+              >
+                {paused ? t.mapResume : t.mapPause}
+              </button>
             </div>
 
-            {/* Interactive SVG Nautical Control Map */}
-            <div className="relative flex w-full flex-1 items-center bg-[var(--bg-map)]">
-              <svg
-                viewBox="0 10 960 398"
-                className="block h-auto w-full select-none"
-                role="img"
-                aria-label="Global Maritime and Air Cargo Corridor Control Map"
-              >
-                <defs>
-                  <radialGradient id="vietnamGlow" cx="50%" cy="50%" r="50%">
-                    <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0.34" />
-                    <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0" />
-                  </radialGradient>
-                  <filter id="routeGlow" x="-20%" y="-20%" width="140%" height="140%">
-                    <feGaussianBlur stdDeviation="2.6" result="blur" />
-                    <feMerge>
-                      <feMergeNode in="blur" />
-                      <feMergeNode in="SourceGraphic" />
-                    </feMerge>
-                  </filter>
-                </defs>
-
-                {/* Latitude & Longitude Graticule */}
-                <g stroke="var(--grid-line)" strokeWidth="1">
-                  {[70, 150, 230, 310, 390].map((y) => (
-                    <line key={`lat-${y}`} x1="0" y1={y} x2="960" y2={y} />
-                  ))}
-                  {[80, 200, 320, 440, 560, 680, 800, 920].map((x) => (
-                    <line key={`lon-${x}`} x1={x} y1="0" x2={x} y2="430" />
-                  ))}
-                </g>
-
-                {/* Graticule Telemetry Coordinates */}
-                <g
-                  fill="var(--text-dim)"
-                  fontSize="9"
-                  fontFamily="JetBrains Mono, monospace"
-                  opacity="0.72"
-                >
-                  <text x="10" y="66">60°N</text>
-                  <text x="10" y="146">30°N</text>
-                  <text x="10" y="226">0° EQ</text>
-                  <text x="10" y="306">30°S</text>
-                  <text x="84" y="398">0° GMT</text>
-                  <text x="352" y="398">105°E VN</text>
-                  <text x="556" y="398">180° IDL</text>
-                  <text x="714" y="398">120°W US</text>
-                </g>
-
-                {/* Stylized World Landmasses */}
-                <g>
-                  {WORLD_CONTINENT_PATHS.map((continent) => (
-                    <path
-                      key={continent.id}
-                      d={continent.d}
-                      fill="var(--land-fill)"
-                      stroke="var(--land-stroke)"
-                      strokeWidth="1.1"
-                      strokeLinejoin="round"
-                    />
-                  ))}
-                </g>
-
-                {/* Vietnam Gateway Radar Halo */}
-                <circle cx="364" cy="208" r="46" fill="url(#vietnamGlow)" />
-
-                {/* Shipping & Air Corridors */}
-                {visibleCorridors.map((corridor) => {
-                  const isActive = corridor.id === activeCorridor.id;
-                  const strokeColor =
-                    corridor.modeGroup === 'air' ? '#f59e0b' : '#0ea5e9';
-                  const pathId = `corridor-path-${corridor.id}`;
-
+            {/* Synchronized Live Disruption Shock Toggles Strip */}
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--bg)]/70 px-3.5 py-2">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="font-mono-tech inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                  <AlertTriangleIcon className="h-3.5 w-3.5 text-[var(--accent-amber)]" />
+                  {t.mapDisruptionsInline}
+                </span>
+                {DISRUPTION_CHIPS.map((chip) => {
+                  const active = activeDisruptions.includes(chip.id);
                   return (
-                    <g
-                      key={corridor.id}
-                      onClick={() => onSelectCorridor(corridor.id)}
-                      className="cursor-pointer"
-                      data-testid={`map-corridor-${corridor.id}`}
+                    <button
+                      key={chip.id}
+                      type="button"
+                      onClick={() => onToggleDisruption(chip.id)}
+                      aria-pressed={active}
+                      data-testid={`hero-disruption-${chip.id}`}
+                      className={`font-mono-tech inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-bold transition-all ${
+                        active
+                          ? 'border-[var(--accent-rose)] bg-[var(--accent-rose-soft)] text-[var(--accent-rose)]'
+                          : 'border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:border-[var(--accent-amber)] hover:text-[var(--text)]'
+                      }`}
                     >
-                      {/* Wide clickable hit area */}
-                      <path
-                        d={corridor.svgPath}
-                        fill="none"
-                        stroke="transparent"
-                        strokeWidth="20"
-                      />
-
-                      {/* Subtle base track */}
-                      <path
-                        id={pathId}
-                        d={corridor.svgPath}
-                        fill="none"
-                        stroke={strokeColor}
-                        strokeWidth={isActive ? 2.6 : 1.4}
-                        strokeOpacity={isActive ? 0.45 : 0.28}
-                        strokeDasharray={
-                          corridor.modeGroup === 'air' ? '5 5' : undefined
-                        }
-                      />
-
-                      {/* Animated flowing telemetry vector */}
-                      <path
-                        d={corridor.svgPath}
-                        fill="none"
-                        stroke={strokeColor}
-                        strokeWidth={isActive ? 2.8 : 1.5}
-                        strokeOpacity={isActive ? 1 : 0.45}
-                        strokeDasharray="10 14"
-                        strokeLinecap="round"
-                        filter={isActive ? 'url(#routeGlow)' : undefined}
-                        className={`animate-route-flow ${
-                          paused ? 'animate-route-flow-paused' : ''
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          active
+                            ? 'bg-[var(--accent-rose)]'
+                            : 'bg-[var(--text-dim)]'
                         }`}
                       />
-
-                      {/* Moving Cargo Pulse Photon */}
-                      {!paused && (
-                        <circle
-                          r={isActive ? 3.5 : 2.2}
-                          fill={strokeColor}
-                          opacity={isActive ? 0.95 : 0.55}
-                        >
-                          <animateMotion
-                            dur={corridor.modeGroup === 'air' ? '5s' : '9s'}
-                            repeatCount="indefinite"
-                          >
-                            <mpath href={`#${pathId}`} />
-                          </animateMotion>
-                        </circle>
-                      )}
-
-                      {/* Live AIS/ADS-B Vessel Beacon */}
-                      <g
-                        transform={`translate(${corridor.vesselPos.x}, ${corridor.vesselPos.y})`}
-                      >
-                        {isActive && (
-                          <circle
-                            r="11"
-                            fill="none"
-                            stroke={strokeColor}
-                            strokeWidth="1.5"
-                            className="animate-radar-ping"
-                          />
-                        )}
-                        <circle
-                          r={isActive ? 6.5 : 4.2}
-                          fill="var(--bg-map)"
-                          stroke={strokeColor}
-                          strokeWidth={isActive ? 2.2 : 1.5}
-                        />
-                        <circle
-                          r={isActive ? 2.8 : 1.8}
-                          fill={strokeColor}
-                        />
-                        {isActive && (
-                          <g transform="translate(10, -14)">
-                            <rect
-                              x="0"
-                              y="0"
-                              width="126"
-                              height="20"
-                              rx="4"
-                              fill="var(--bg-elevated)"
-                              fillOpacity="0.94"
-                              stroke={strokeColor}
-                              strokeWidth="1"
-                            />
-                            <text
-                              x="6"
-                              y="13"
-                              fill="var(--text)"
-                              fontSize="9"
-                              fontWeight="600"
-                              fontFamily="JetBrains Mono, monospace"
-                            >
-                              {corridor.vesselName.slice(0, 18)}
-                            </text>
-                          </g>
-                        )}
-                      </g>
-                    </g>
+                      <span>{lang === 'vi' ? chip.labelVi : chip.labelEn}</span>
+                    </button>
                   );
                 })}
+              </div>
 
-                {/* Port & Airport Hub Nodes */}
-                {PORT_HUBS.map((hub) => {
-                  const isHighlighted =
-                    hub.code === activeCorridor.originCode ||
-                    hub.code === activeCorridor.destCode;
-                  const nodeColor =
-                    hub.type === 'air' ? '#f59e0b' : '#10b981';
-                  const offset = LABEL_OFFSETS[hub.code] ?? {
-                    dx: 8,
-                    dy: 4,
-                    anchor: 'start' as const,
-                  };
-                  const pillWidth = hub.code.length * 6.5 + 10;
-                  const pillX =
-                    offset.anchor === 'end'
-                      ? hub.x + offset.dx - pillWidth
-                      : hub.x + offset.dx - 4;
-
-                  return (
-                    <g
-                      key={hub.code}
-                      onClick={() => onSelectCorridor(hub.linkedCorridorId)}
-                      className="cursor-pointer"
-                    >
-                      <circle
-                        cx={hub.x}
-                        cy={hub.y}
-                        r={isHighlighted ? 5.2 : 3.4}
-                        fill={isHighlighted ? nodeColor : 'var(--bg-elevated)'}
-                        stroke={nodeColor}
-                        strokeWidth={isHighlighted ? 2 : 1.4}
-                      />
-                      <rect
-                        x={pillX}
-                        y={hub.y + offset.dy - 10}
-                        width={pillWidth}
-                        height="14"
-                        rx="3"
-                        fill="var(--bg-elevated)"
-                        fillOpacity={isHighlighted ? 0.95 : 0.78}
-                        stroke={
-                          isHighlighted ? nodeColor : 'var(--border-strong)'
-                        }
-                        strokeWidth={isHighlighted ? 1 : 0.6}
-                      />
-                      <text
-                        x={
-                          offset.anchor === 'end'
-                            ? hub.x + offset.dx - 5
-                            : hub.x + offset.dx + 1
-                        }
-                        y={hub.y + offset.dy}
-                        textAnchor={offset.anchor}
-                        fill={isHighlighted ? 'var(--text)' : 'var(--text-muted)'}
-                        fontSize="9"
-                        fontWeight={isHighlighted ? '700' : '500'}
-                        fontFamily="JetBrains Mono, monospace"
-                      >
-                        {hub.code}
-                      </text>
-                    </g>
-                  );
-                })}
-              </svg>
+              <span className="font-mono-tech text-[10px] font-semibold text-[var(--text-dim)]">
+                {mapState.congestedPortCount}/8 HUBS STRESSED
+              </span>
             </div>
+
+            {/* Interactive SVG World Map */}
+            <GlobalCorridorMap
+              t={t}
+              lang={lang}
+              mapState={mapState}
+              laneFilter={laneFilter}
+              selectedCorridorId={selectedCorridorId}
+              selectedPortCode={selectedPortCode}
+              paused={paused}
+              onSelectPort={handleSelectPort}
+              onSelectLane={handleSelectLane}
+              onToggleDisruption={onToggleDisruption}
+            />
 
             {/* Bottom 4-Corridor Selector Bar */}
             <div className="grid grid-cols-2 gap-2 border-t border-[var(--border)] bg-[var(--bg-elevated)] p-2.5 sm:grid-cols-4">
@@ -516,14 +350,17 @@ export function ControlTowerHero({
                   <button
                     key={corridor.id}
                     type="button"
-                    onClick={() => onSelectCorridor(corridor.id)}
+                    onClick={() => {
+                      onSelectCorridor(corridor.id);
+                      setInspectorTab('corridor');
+                    }}
                     data-testid={`corridor-btn-${corridor.id}`}
                     className={`cursor-pointer rounded-lg border px-2.5 py-2 text-left transition-all ${
                       isSelected
                         ? isAir
                           ? 'border-[var(--accent-amber)] bg-[var(--accent-amber-soft)]'
                           : 'border-[var(--accent-cyan)] bg-[var(--accent-cyan-soft)]'
-                        : 'border-[var(--border)] bg-[var(--bg-panel)] hover:border-[var(--border-strong)]'
+                        : 'border-[var(--border)] bg-[var(--bg)]/60 hover:border-[var(--border-strong)]'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-1">
@@ -538,8 +375,8 @@ export function ControlTowerHero({
                     </div>
                     <div className="mt-0.5 truncate text-[11px] text-[var(--text-muted)]">
                       {lang === 'vi'
-                        ? `${corridor.originNameVi} → ${corridor.destNameVi}`
-                        : `${corridor.originNameEn} → ${corridor.destNameEn}`}
+                        ? `${corridor.originNameVi} -> ${corridor.destNameVi}`
+                        : `${corridor.originNameEn} -> ${corridor.destNameEn}`}
                     </div>
                   </button>
                 );
@@ -547,179 +384,332 @@ export function ControlTowerHero({
             </div>
           </div>
 
-          {/* Right Live Corridor & Container Telemetry Inspector (4 cols) */}
-          <div className="panel-card flex flex-col justify-between rounded-xl p-3.5 lg:col-span-4">
+          {/* Right Live Inspector Rail: Port Telemetry Inspector <-> Vessel & Corridor Telemetry (4 cols) */}
+          <div className="panel-card flex flex-col justify-between rounded-xl p-4 lg:col-span-4">
             <div>
-              {/* Vessel / Corridor Header */}
-              <div className="flex items-start justify-between gap-2 border-b border-[var(--border)] pb-2.5">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`font-mono-tech inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                        activeCorridor.modeGroup === 'air'
-                          ? 'bg-[var(--accent-amber-soft)] text-[var(--accent-amber)]'
-                          : 'bg-[var(--accent-cyan-soft)] text-[var(--accent-cyan)]'
-                      }`}
-                    >
-                      {activeCorridor.modeGroup === 'air' ? (
-                        <PlaneIcon className="h-3 w-3" />
-                      ) : (
-                        <ShipIcon className="h-3 w-3" />
-                      )}
-                      {activeCorridor.modeGroup === 'air'
-                        ? 'AIR FREIGHTER'
-                        : 'OCEAN LINER'}
-                    </span>
-                    <span className="font-mono-tech text-xs font-semibold text-[var(--text-muted)]">
-                      {activeCorridor.code}
-                    </span>
-                  </div>
-                  <h2 className="mt-1 truncate text-base font-bold text-[var(--text)]">
-                    {activeCorridor.vesselName}
-                  </h2>
-                  <div className="font-mono-tech text-[11px] text-[var(--text-muted)]">
-                    {activeCorridor.callsign}
-                  </div>
-                </div>
-                <span className="font-mono-tech shrink-0 rounded border border-[var(--accent-emerald)]/30 bg-[var(--accent-emerald-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--accent-emerald)]">
-                  LIVE
-                </span>
-              </div>
-
-              {/* ETA Countdown & Route Progress */}
-              <div className="mt-2.5 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] p-2.5">
-                <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)]">
-                  <span>{t.etaCountdown}</span>
-                  <span className="font-mono-tech font-semibold text-[var(--text)]">
-                    {activeCorridor.distanceKm.toLocaleString('en-US')} km
-                  </span>
-                </div>
-                <div
-                  className="font-mono-tech mt-0.5 text-lg font-bold tracking-tight text-[var(--accent-cyan)]"
-                  data-testid="live-eta-countdown"
+              {/* Dual Inspector Mode Switcher */}
+              <div className="mb-3 grid grid-cols-2 gap-1 rounded-lg border border-[var(--border)] bg-[var(--bg)] p-1">
+                <button
+                  type="button"
+                  onClick={() => setInspectorTab('port')}
+                  data-testid="inspector-tab-port"
+                  className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-bold transition-colors ${
+                    inspectorTab === 'port'
+                      ? 'bg-[var(--bg-navy)] text-white'
+                      : 'text-[var(--text-muted)] hover:text-[var(--text)]'
+                  }`}
                 >
-                  {formatCountdown(
-                    activeCorridor.etaRemainingSeconds - elapsedSec,
-                  )}
-                </div>
-                <div className="mt-2 flex items-center justify-between text-[11px]">
-                  <span className="text-[var(--text-muted)]">
-                    {t.routeCompletion}
-                  </span>
-                  <span className="font-mono-tech font-semibold text-[var(--text)]">
-                    {activeCorridor.progressPct}%
-                  </span>
-                </div>
-                <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-subtle)]">
-                  <div
-                    className={`h-full rounded-full transition-all ${
-                      activeCorridor.modeGroup === 'air'
-                        ? 'bg-[var(--accent-amber)]'
-                        : 'bg-[var(--accent-cyan)]'
-                    }`}
-                    style={{ width: `${activeCorridor.progressPct}%` }}
-                  />
-                </div>
+                  <AnchorIcon className="h-3.5 w-3.5" />
+                  <span>{t.mapTabPort}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInspectorTab('corridor')}
+                  data-testid="inspector-tab-corridor"
+                  className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-bold transition-colors ${
+                    inspectorTab === 'corridor'
+                      ? 'bg-[var(--bg-navy)] text-white'
+                      : 'text-[var(--text-muted)] hover:text-[var(--text)]'
+                  }`}
+                >
+                  <CompassIcon className="h-3.5 w-3.5" />
+                  <span>{t.mapTabCorridor}</span>
+                </button>
               </div>
 
-              {/* Container Telemetry 2x2 Grid */}
-              <div className="mt-2.5 grid grid-cols-2 gap-2">
-                <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] p-2">
-                  <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)]">
-                    <span className="flex items-center gap-1">
-                      <ThermometerIcon className="h-3.5 w-3.5 text-[var(--accent-cyan)]" />
-                      {t.tempTelemetry}
-                    </span>
-                  </div>
-                  <div className="mt-0.5 flex items-end justify-between gap-1">
-                    <span className="font-mono-tech text-sm font-bold text-[var(--text)]">
-                      {liveTempC > 0 ? `+${liveTempC}` : liveTempC}°C
-                    </span>
-                    <svg
-                      viewBox="0 0 100 28"
-                      className="h-5 w-14 shrink-0"
-                      aria-hidden="true"
-                    >
-                      <polyline
-                        fill="none"
-                        stroke="#0ea5e9"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        points={sparklinePoints}
-                      />
-                    </svg>
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] p-2">
-                  <div className="flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
-                    <DropletIcon className="h-3.5 w-3.5 text-[var(--accent-cyan)]" />
-                    {t.humidityTelemetry}
-                  </div>
-                  <div className="font-mono-tech mt-0.5 text-sm font-bold text-[var(--text)]">
-                    {activeCorridor.telemetry.humidityPct}% RH
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] p-2">
-                  <div className="flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
-                    <ActivityIcon className="h-3.5 w-3.5 text-[var(--accent-emerald)]" />
-                    {t.shockTelemetry}
-                  </div>
-                  <div className="font-mono-tech mt-0.5 text-xs font-bold text-[var(--accent-emerald)]">
-                    {activeCorridor.telemetry.shockG}G · NOMINAL
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] p-2">
-                  <div className="flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
-                    <ShieldCheckIcon className="h-3.5 w-3.5 text-[var(--accent-emerald)]" />
-                    {t.sealTelemetry}
-                  </div>
-                  <div className="font-mono-tech mt-0.5 truncate text-[11px] font-semibold text-[var(--text)]">
-                    {activeCorridor.telemetry.sealId.split('·')[0].trim()}
-                  </div>
-                </div>
-              </div>
-
-              {/* Port Congestion Status */}
-              <div className="mt-2.5 space-y-1.5">
-                {[
-                  { label: t.originPortStatus, hub: originHub },
-                  { label: t.destPortStatus, hub: destHub },
-                ].map(
-                  ({ label, hub }) =>
-                    hub && (
-                      <div
-                        key={hub.code}
-                        className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-2.5 py-1.5"
-                      >
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-[var(--text-dim)]">
-                            <AnchorIcon className="h-3 w-3" />
-                            <span>{label}</span>
-                          </div>
-                          <div className="truncate text-xs font-semibold text-[var(--text)]">
-                            {hub.code} · {lang === 'vi' ? hub.nameVi : hub.nameEn}
-                          </div>
-                        </div>
-                        <div className="shrink-0 text-right">
-                          <span
-                            className={`inline-block rounded border px-1.5 py-0.5 text-[10px] font-bold uppercase ${congestionBadgeStyle(
-                              hub.congestion,
-                            )}`}
-                          >
-                            {congestionLabel(hub.congestion)}
-                          </span>
-                          <div className="font-mono-tech mt-0.5 text-[10px] text-[var(--text-muted)]">
-                            {t.berthWait}: {hub.dwellHours}h
-                          </div>
-                        </div>
+              {inspectorTab === 'port' ? (
+                <div data-testid="port-inspector-panel">
+                  {/* Port Hub Header */}
+                  <div className="flex items-start justify-between gap-2 border-b border-[var(--border)] pb-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span
+                          data-testid="inspected-port-code"
+                          className="font-mono-tech rounded bg-[var(--accent-cyan-soft)] px-2 py-0.5 text-[11px] font-extrabold text-[var(--accent-cyan)]"
+                        >
+                          {inspectedPort.code}
+                        </span>
+                        <span className="font-mono-tech text-[10px] font-semibold uppercase text-[var(--text-dim)]">
+                          {inspectedPort.type}
+                        </span>
                       </div>
-                    ),
-                )}
-              </div>
+                      <h2
+                        data-testid="inspected-port-name"
+                        className="mt-1.5 truncate text-base font-extrabold text-[var(--text)]"
+                      >
+                        {lang === 'vi'
+                          ? inspectedPort.nameVi
+                          : inspectedPort.nameEn}
+                      </h2>
+                      <div className="text-xs text-[var(--text-muted)]">
+                        {lang === 'vi'
+                          ? `${inspectedPort.countryVi} · ${inspectedPort.regionVi}`
+                          : `${inspectedPort.countryEn} · ${inspectedPort.regionEn}`}
+                      </div>
+                    </div>
+                    <span
+                      data-testid="inspected-port-status"
+                      className={`font-mono-tech shrink-0 rounded border px-2 py-0.5 text-[10px] font-bold uppercase ${statusPillClass(
+                        inspectedPort.status,
+                      )}`}
+                    >
+                      {inspectedPort.status}
+                    </span>
+                  </div>
+
+                  {/* Key Port Telemetry Metrics: Dwell Time, Congestion %, Annual & Daily TEU */}
+                  <div className="mt-3 grid grid-cols-2 gap-2.5">
+                    <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-2.5">
+                      <div className="text-[11px] font-medium text-[var(--text-muted)]">
+                        {t.mapPortDwell}
+                      </div>
+                      <div
+                        data-testid="inspected-port-dwell"
+                        className="font-mono-tech mt-1 text-xl font-extrabold text-[var(--text)]"
+                      >
+                        {inspectedPort.effectiveDwellHours}h
+                      </div>
+                      <div className="font-mono-tech text-[10px] text-[var(--text-dim)]">
+                        {inspectedPort.disruptionDeltaHours > 0
+                          ? `Base ${inspectedPort.baseDwellHours}h (+${inspectedPort.disruptionDeltaHours}h)`
+                          : t.mapPortBaseline}
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-2.5">
+                      <div className="text-[11px] font-medium text-[var(--text-muted)]">
+                        {t.mapPortCongestion}
+                      </div>
+                      <div
+                        data-testid="inspected-port-congestion"
+                        className="font-mono-tech mt-1 text-xl font-extrabold text-[var(--accent-cyan)]"
+                      >
+                        {inspectedPort.effectiveCongestionPct}%
+                      </div>
+                      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-subtle)]">
+                        <div
+                          className={`h-full rounded-full transition-all ${statusBarClass(
+                            inspectedPort.status,
+                          )}`}
+                          style={{
+                            width: `${inspectedPort.effectiveCongestionPct}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-2.5">
+                      <div className="text-[11px] font-medium text-[var(--text-muted)]">
+                        {t.mapPortAnnualTeu}
+                      </div>
+                      <div
+                        data-testid="inspected-port-teu"
+                        className="font-mono-tech mt-1 text-base font-extrabold text-[var(--text)]"
+                      >
+                        {inspectedPort.annualThroughputMTeu.toFixed(1)}M TEU
+                      </div>
+                      <div className="font-mono-tech text-[10px] text-[var(--text-dim)]">
+                        {inspectedPort.dailyThroughputTeu.toLocaleString(
+                          'en-US',
+                        )}{' '}
+                        TEU/day
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-2.5">
+                      <div className="text-[11px] font-medium text-[var(--text-muted)]">
+                        {t.customsChannel}
+                      </div>
+                      <div
+                        className={`font-mono-tech mt-1 text-base font-extrabold ${
+                          inspectedPort.customsChannel === 'GREEN'
+                            ? 'text-[var(--accent-emerald)]'
+                            : inspectedPort.customsChannel === 'AMBER'
+                              ? 'text-[var(--accent-amber)]'
+                              : 'text-[var(--accent-cyan)]'
+                        }`}
+                      >
+                        {inspectedPort.customsChannel}
+                      </div>
+                      <div className="font-mono-tech text-[10px] text-[var(--text-dim)]">
+                        AIS / EDI Live
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Disruption Impact Box if Port is Affected */}
+                  {inspectedPort.disruptionImpactEn && (
+                    <div
+                      data-testid="inspected-port-impact"
+                      className="mt-3 rounded-lg border border-[var(--accent-rose)]/35 bg-[var(--accent-rose-soft)] p-2.5 text-xs leading-relaxed text-[var(--text)]"
+                    >
+                      <div className="font-mono-tech mb-0.5 flex items-center gap-1 text-[10px] font-bold uppercase text-[var(--accent-rose)]">
+                        <AlertTriangleIcon className="h-3.5 w-3.5" />
+                        <span>{t.mapPortShockDelta}</span>
+                      </div>
+                      <div>
+                        {lang === 'vi'
+                          ? inspectedPort.disruptionImpactVi
+                          : inspectedPort.disruptionImpactEn}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Quick 8-Hub Port Switcher Pills */}
+                  <div className="mt-3">
+                    <div className="mb-1.5 flex flex-wrap gap-1">
+                      {mapState.ports.map((p) => (
+                        <button
+                          key={p.code}
+                          type="button"
+                          onClick={() => handleSelectPort(p)}
+                          data-testid={`port-pill-${p.code}`}
+                          className={`font-mono-tech cursor-pointer rounded border px-2 py-0.5 text-[10px] font-bold transition-colors ${
+                            p.code === inspectedPort.code
+                              ? 'border-[var(--accent-cyan)] bg-[var(--accent-cyan)] text-white'
+                              : 'border-[var(--border)] bg-[var(--bg)] text-[var(--text-muted)] hover:border-[var(--accent-cyan)] hover:text-[var(--text)]'
+                          }`}
+                        >
+                          {p.code}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div data-testid="corridor-inspector-panel">
+                  {/* Vessel / Corridor Header */}
+                  <div className="flex items-start justify-between gap-2 border-b border-[var(--border)] pb-2.5">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`font-mono-tech inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                            activeCorridor.modeGroup === 'air'
+                              ? 'bg-[var(--accent-amber-soft)] text-[var(--accent-amber)]'
+                              : 'bg-[var(--accent-cyan-soft)] text-[var(--accent-cyan)]'
+                          }`}
+                        >
+                          {activeCorridor.modeGroup === 'air' ? (
+                            <PlaneIcon className="h-3 w-3" />
+                          ) : (
+                            <ShipIcon className="h-3 w-3" />
+                          )}
+                          {activeCorridor.modeGroup === 'air'
+                            ? 'AIR FREIGHTER'
+                            : 'OCEAN LINER'}
+                        </span>
+                        <span className="font-mono-tech text-xs font-semibold text-[var(--text-muted)]">
+                          {activeCorridor.code}
+                        </span>
+                      </div>
+                      <h2 className="mt-1 truncate text-base font-extrabold text-[var(--text)]">
+                        {activeCorridor.vesselName}
+                      </h2>
+                      <div className="font-mono-tech text-[11px] text-[var(--text-muted)]">
+                        {activeCorridor.callsign}
+                      </div>
+                    </div>
+                    <span className="font-mono-tech shrink-0 rounded border border-[var(--accent-emerald)]/30 bg-[var(--accent-emerald-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--accent-emerald)]">
+                      LIVE
+                    </span>
+                  </div>
+
+                  {/* ETA Countdown & Route Progress */}
+                  <div className="mt-2.5 rounded-lg border border-[var(--border)] bg-[var(--bg)] p-2.5">
+                    <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)]">
+                      <span>{t.etaCountdown}</span>
+                      <span className="font-mono-tech font-semibold text-[var(--text)]">
+                        {activeCorridor.distanceKm.toLocaleString('en-US')} km
+                      </span>
+                    </div>
+                    <div
+                      className="font-mono-tech mt-0.5 text-lg font-extrabold tracking-tight text-[var(--accent-cyan)]"
+                      data-testid="live-eta-countdown"
+                    >
+                      {formatCountdown(
+                        activeCorridor.etaRemainingSeconds - elapsedSec,
+                      )}
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-[11px]">
+                      <span className="text-[var(--text-muted)]">
+                        {t.routeCompletion}
+                      </span>
+                      <span className="font-mono-tech font-semibold text-[var(--text)]">
+                        {activeCorridor.progressPct}%
+                      </span>
+                    </div>
+                    <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-subtle)]">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          activeCorridor.modeGroup === 'air'
+                            ? 'bg-[var(--accent-amber)]'
+                            : 'bg-[var(--accent-cyan)]'
+                        }`}
+                        style={{ width: `${activeCorridor.progressPct}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Container Telemetry 2x2 Grid */}
+                  <div className="mt-2.5 grid grid-cols-2 gap-2">
+                    <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-2">
+                      <div className="flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
+                        <ThermometerIcon className="h-3.5 w-3.5 text-[var(--accent-cyan)]" />
+                        {t.tempTelemetry}
+                      </div>
+                      <div className="mt-0.5 flex items-end justify-between gap-1">
+                        <span className="font-mono-tech text-sm font-bold text-[var(--text)]">
+                          {liveTempC > 0 ? `+${liveTempC}` : liveTempC}°C
+                        </span>
+                        <svg
+                          viewBox="0 0 100 28"
+                          className="h-5 w-14 shrink-0"
+                          aria-hidden="true"
+                        >
+                          <polyline
+                            fill="none"
+                            stroke="#0284C7"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            points={sparklinePoints}
+                          />
+                        </svg>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-2">
+                      <div className="flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
+                        <DropletIcon className="h-3.5 w-3.5 text-[var(--accent-cyan)]" />
+                        {t.humidityTelemetry}
+                      </div>
+                      <div className="font-mono-tech mt-0.5 text-sm font-bold text-[var(--text)]">
+                        {activeCorridor.telemetry.humidityPct}% RH
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-2">
+                      <div className="flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
+                        <ActivityIcon className="h-3.5 w-3.5 text-[var(--accent-emerald)]" />
+                        {t.shockTelemetry}
+                      </div>
+                      <div className="font-mono-tech mt-0.5 text-xs font-bold text-[var(--accent-emerald)]">
+                        {activeCorridor.telemetry.shockG}G · NOMINAL
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-2">
+                      <div className="flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
+                        <ShieldCheckIcon className="h-3.5 w-3.5 text-[var(--accent-emerald)]" />
+                        {t.sealTelemetry}
+                      </div>
+                      <div className="font-mono-tech mt-0.5 truncate text-[11px] font-semibold text-[var(--text)]">
+                        {activeCorridor.telemetry.sealId.split('·')[0].trim()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Load into Quote Engine Button */}
@@ -727,7 +717,7 @@ export function ControlTowerHero({
               type="button"
               onClick={() => onLoadCorridorToQuote(activeCorridor)}
               data-testid="load-corridor-quote"
-              className="mt-3 flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-[var(--accent-cyan)] px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+              className="mt-4 flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-[var(--accent-cyan)] px-4 py-2.5 text-sm font-bold text-white transition-opacity hover:opacity-90"
             >
               <span>{t.loadIntoQuote}</span>
               <ArrowRightIcon className="h-4 w-4" />
