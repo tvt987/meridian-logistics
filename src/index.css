@@ -1,0 +1,169 @@
+@import "tailwindcss";
+
+:root,
+[data-theme='dark'] {
+  --bg: #080c12;
+  --bg-elevated: #0d141f;
+  --bg-panel: #101826;
+  --bg-subtle: #162234;
+  --bg-map: #070d16;
+  --land-fill: #152235;
+  --land-stroke: #263b57;
+  --grid-line: rgba(56, 189, 248, 0.08);
+  --border: rgba(148, 163, 184, 0.16);
+  --border-strong: rgba(148, 163, 184, 0.3);
+  --text: #f1f5f9;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+  --accent-cyan: #0ea5e9;
+  --accent-cyan-soft: rgba(14, 165, 233, 0.14);
+  --accent-amber: #f59e0b;
+  --accent-amber-soft: rgba(245, 158, 11, 0.14);
+  --accent-emerald: #10b981;
+  --accent-emerald-soft: rgba(16, 185, 129, 0.14);
+  --accent-rose: #f43f5e;
+  --accent-rose-soft: rgba(244, 63, 94, 0.14);
+  --shadow-panel: 0 18px 42px -18px rgba(0, 0, 0, 0.72);
+  color-scheme: dark;
+}
+
+[data-theme='light'] {
+  --bg: #f4f6f8;
+  --bg-elevated: #ffffff;
+  --bg-panel: #ffffff;
+  --bg-subtle: #e9eff5;
+  --bg-map: #e8f1f8;
+  --land-fill: #d5e2ee;
+  --land-stroke: #9ab3c9;
+  --grid-line: rgba(2, 132, 199, 0.09);
+  --border: rgba(15, 23, 42, 0.12);
+  --border-strong: rgba(15, 23, 42, 0.24);
+  --text: #0b1220;
+  --text-muted: #475569;
+  --text-dim: #64748b;
+  --accent-cyan: #0284c7;
+  --accent-cyan-soft: rgba(2, 132, 199, 0.11);
+  --accent-amber: #d97706;
+  --accent-amber-soft: rgba(217, 119, 6, 0.12);
+  --accent-emerald: #059669;
+  --accent-emerald-soft: rgba(5, 150, 105, 0.12);
+  --accent-rose: #e11d48;
+  --accent-rose-soft: rgba(225, 29, 72, 0.11);
+  --shadow-panel: 0 14px 32px -16px rgba(15, 23, 42, 0.12);
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  font-family: 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  overflow-x: clip;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+}
+
+.font-mono-tech {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.maritime-grid-bg {
+  background-image:
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.panel-card {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-panel);
+}
+
+@keyframes routeDashFlow {
+  to {
+    stroke-dashoffset: -48;
+  }
+}
+
+@keyframes radarPing {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.85;
+  }
+  70% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+.animate-route-flow {
+  animation: routeDashFlow 2.4s linear infinite;
+}
+
+.animate-route-flow-paused {
+  animation-play-state: paused;
+}
+
+.animate-radar-ping {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: radarPing 2.2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* Custom sleek scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}
+
+/* Official A4 Bill of Lading Print Stylesheet */
+.print-only-bl {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    width: 100%;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only-bl {
+    display: block !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+}
