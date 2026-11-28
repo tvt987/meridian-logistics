@@ -3,8 +3,8 @@ import type { Lang } from '../types/logistics';
 export const I18N = {
   en: {
     brand: 'MERIDIAN',
-    brandSub: 'CONTROL TOWER v4.0',
-    navMap: 'Sea-Lane Map',
+    brandSub: 'CONTROL TOWER v5.0',
+    navMap: '3D Port & Map',
     navReroute: 'Reroute Lab',
     navIncoterms: 'Incoterms 2020',
     navContainer: 'Container 3D',
@@ -16,10 +16,10 @@ export const I18N = {
     instantQuoteCta: 'Instant Quote',
     themeDaylight: 'Daylight',
     themeNightWatch: 'Night-Watch',
-    heroEyebrow: 'FLEXPORT / MAERSK DAYLIGHT CONTROL TOWER  ·  LIVE SEA-LANE SVG MAP  ·  .NET 10 CORE',
-    heroTitle: 'Global Maritime Control Tower & Trade Compliance Hub',
+    heroEyebrow: 'MERIDIAN v5.0  ·  60FPS THREE.JS PBR PORT TWIN  ·  SOLAS HYDROSTATICS  ·  .NET 10 CORE',
+    heroTitle: '3D Deep-Water Port Twin & Maritime Control Tower',
     heroSubtitle:
-      'Live animated global sea-lane & air-corridor orchestration with synchronized Red Sea / Cat Lai / USWC disruption zones, Incoterms 2020 cost-risk transfer visualizer, 3D SOLAS VGM balance auditing, and Vietnam FTA customs intelligence.',
+      'Live 60fps Three.js Cái Mép deep-water container terminal with articulated STS gantry cranes, hydrostatic SOLAS VGM vessel heel & GM stability physics, global sea-lane disruption map, Incoterms 2020 & Vietnam FTA customs.',
     kpiVessels: 'Active Vessels & Jets',
     kpiTeu: 'TEU In Transit',
     kpiCustoms: 'Avg Customs Dwell',
@@ -268,7 +268,7 @@ export const I18N = {
     footerOpsDesk: 'HCMC Control Desk',
     footerCompliance: 'Compliance & Security',
     footerDisclaimer:
-      'MERIDIAN v4.0 Daylight Maritime Control Tower & .NET 10 Trade Platform engineered by Truong Van Tinh (TVT Studio). Global sea-lanes, Incoterms 2020 cost-risk chains, SOLAS VGM specs & Vietnam FTA tariff curves modeled on 2026 corridors.',
+      'MERIDIAN v5.0 60fps 3D Deep-Water Port Twin, Daylight Maritime Control Tower & .NET 10 Trade Platform engineered by Truong Van Tinh (TVT Studio). Hydrostatic SOLAS VGM stability, STS crane kinematics, Incoterms 2020 & Vietnam FTA tariff curves modeled on 2026 corridors.',
     /* v4.0 Global Sea-Lane Map & Port Inspector */
     mapTabCorridor: 'Vessel & Corridor',
     mapTabPort: 'Port Inspector',
@@ -322,8 +322,8 @@ export const I18N = {
   },
   vi: {
     brand: 'MERIDIAN',
-    brandSub: 'CONTROL TOWER v4.0',
-    navMap: 'Bản đồ Hải trình',
+    brandSub: 'CONTROL TOWER v5.0',
+    navMap: 'Cảng 3D & Bản đồ',
     navReroute: 'Mô phỏng Tuyến',
     navIncoterms: 'Incoterms 2020',
     navContainer: 'Xếp Cont 3D',
@@ -335,10 +335,10 @@ export const I18N = {
     instantQuoteCta: 'Báo giá ngay',
     themeDaylight: 'Ban ngày',
     themeNightWatch: 'Ca đêm',
-    heroEyebrow: 'THÁP ĐIỀU PHỐI HÀNG HẢI CHUẨN DAYLIGHT  ·  BẢN ĐỒ TUYẾN BIỂN SVG  ·  LÕI .NET 10',
-    heroTitle: 'Tháp Điều Phối Hàng Hải Toàn Cầu & Chuỗi Cung Ứng',
+    heroEyebrow: 'MERIDIAN v5.0  ·  CẢNG NƯỚC SÂU 3D THREE.JS PBR  ·  THỦY TĨNH SOLAS  ·  LÕI .NET 10',
+    heroTitle: 'Song Sinh Số Cảng Nước Sâu 3D & Tháp Điều Phối Hàng Hải',
     heroSubtitle:
-      'Bản đồ hải trình biển & hàng không trực tiếp đồng bộ vùng đứt gãy Biển Đỏ / Cát Lái / USWC, Trực quan hóa Chi phí & Rủi ro Incoterms 2020 (EXW–DDP), Kiểm định 3D SOLAS VGM và Thuế FTA Việt Nam.',
+      'Mô phỏng 60fps Three.js cảng Cái Mép – Thị Vải với cần cẩu giàn STS, vật lý thủy tĩnh cân bằng nghiêng tàu SOLAS VGM, bản đồ hải trình toàn cầu, Incoterms 2020 và thuế FTA Việt Nam.',
     kpiVessels: 'Tàu & Chuyên cơ Hoạt động',
     kpiTeu: 'Container TEU Đang chạy',
     kpiCustoms: 'Thời gian Thông quan TB',
@@ -587,7 +587,7 @@ export const I18N = {
     footerOpsDesk: 'Trung tâm Điều hành TP.HCM',
     footerCompliance: 'Chứng nhận & An ninh',
     footerDisclaimer:
-      'MERIDIAN v4.0 Tháp Điều phối Hàng hải Daylight & Lõi Thương mại .NET 10 thiết kế bởi Trương Văn Tình (TVT Studio). Tuyến biển toàn cầu, chuỗi chi phí/rủi ro Incoterms 2020, SOLAS VGM & biểu thuế FTA Việt Nam mô phỏng theo chuẩn 2026.',
+      'MERIDIAN v5.0 Song sinh số Cảng 3D, Tháp Điều phối Hàng hải Daylight & Lõi Thương mại .NET 10 thiết kế bởi Trương Văn Tình (TVT Studio). Thủy tĩnh tàu SOLAS VGM, cẩu STS, Incoterms 2020 & biểu thuế FTA Việt Nam mô phỏng theo chuẩn 2026.',
     /* v4.0 Global Sea-Lane Map & Port Inspector */
     mapTabCorridor: 'Tàu & Tuyến chạy',
     mapTabPort: 'Soi Cảng Hub',

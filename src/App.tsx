@@ -349,6 +349,7 @@ export function App() {
         <ControlTowerHero
           t={t}
           lang={lang}
+          theme={theme}
           selectedCorridorId={selectedCorridorId}
           activeDisruptions={activeDisruptions}
           openAlertsCount={alertCounts.totalActive}

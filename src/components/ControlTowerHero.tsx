@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { SHIPPING_CORRIDORS } from '../data/corridors';
 import type { I18nDict } from '../data/i18n';
 import { formatCountdown } from '../engines/freight';
@@ -10,6 +10,7 @@ import type {
   Lang,
   PortStatusLevel,
   ShippingCorridor,
+  Theme,
 } from '../types/logistics';
 import { GlobalCorridorMap, type MapLaneFilter } from './GlobalCorridorMap';
 import {
@@ -25,9 +26,12 @@ import {
   ThermometerIcon,
 } from './Icons';
 
+const MaritimePort3DStage = lazy(() => import('./MaritimePort3DStage'));
+
 interface ControlTowerHeroProps {
   t: I18nDict;
   lang: Lang;
+  theme: Theme;
   selectedCorridorId: string;
   activeDisruptions: DisruptionScenarioId[];
   openAlertsCount: number;
@@ -80,6 +84,7 @@ const DISRUPTION_CHIPS: {
 export function ControlTowerHero({
   t,
   lang,
+  theme,
   selectedCorridorId,
   activeDisruptions,
   openAlertsCount,
@@ -154,25 +159,25 @@ export function ControlTowerHero({
   return (
     <section
       id="control-map"
-      className="no-print maritime-grid-bg relative border-b border-[var(--border)] pt-4 pb-8 lg:pt-5 lg:pb-10"
+      className="no-print maritime-grid-bg relative border-b border-[var(--border)] pt-3 pb-8 lg:pt-3.5 lg:pb-10"
     >
       <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8">
         {/* Clean Flexport/Maersk Executive Masthead + KPI Strip */}
-        <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-end">
+        <div className="mb-3 grid grid-cols-1 gap-3 lg:grid-cols-12 lg:items-end">
           <div className="lg:col-span-7">
-            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-1 text-[10px] font-bold tracking-[0.09em] text-[var(--accent-cyan)] shadow-xs sm:text-[11px]">
+            <div className="mb-1.5 inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-0.5 text-[10px] font-bold tracking-[0.09em] text-[var(--accent-cyan)] shadow-xs sm:text-[11px]">
               <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--accent-emerald)]" />
               <span>{t.heroEyebrow}</span>
             </div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-[var(--text)] sm:text-3xl lg:text-[34px] lg:leading-[1.12]">
+            <h1 className="text-xl font-extrabold tracking-tight text-[var(--text)] sm:text-2xl lg:text-[27px] lg:leading-[1.15]">
               {t.heroTitle}
             </h1>
-            <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-[var(--text-muted)] sm:text-sm">
+            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-[var(--text-muted)]">
               {t.heroSubtitle}
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 lg:col-span-5">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:col-span-5">
             {[
               {
                 label: t.kpiVessels,
@@ -216,11 +221,11 @@ export function ControlTowerHero({
               <a
                 key={kpi.label}
                 href={kpi.href}
-                className="panel-card rounded-xl px-3.5 py-2.5 transition-all hover:border-[var(--accent-cyan)]"
+                className="panel-card rounded-xl px-3 py-2 transition-all hover:border-[var(--accent-cyan)]"
               >
                 <div className="flex items-center justify-between gap-1">
                   <span
-                    className={`font-mono-tech text-lg font-extrabold ${kpi.tone}`}
+                    className={`font-mono-tech text-base font-extrabold sm:text-lg ${kpi.tone}`}
                   >
                     {kpi.value}
                   </span>
@@ -243,6 +248,19 @@ export function ControlTowerHero({
             ))}
           </div>
         </div>
+
+        {/* v5.0 Flagship Above-the-Fold 60fps Three.js PBR Deep-Water Port & Articulated STS Crane Twin */}
+        <Suspense
+          fallback={
+            <div className="panel-card mb-5 flex h-[340px] items-center justify-center rounded-xl sm:h-[440px] lg:h-[505px]">
+              <span className="font-mono-tech text-xs font-bold uppercase tracking-widest text-[var(--text-muted)]">
+                Initializing 60fps Three.js PBR Deep-Water Port &amp; STS Gantry Crane Twin...
+              </span>
+            </div>
+          }
+        >
+          <MaritimePort3DStage lang={lang} theme={theme} />
+        </Suspense>
 
         {/* Main Split Maritime Control Tower Stage */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">

@@ -17,12 +17,16 @@ export default defineConfig({
           ) {
             return 'react';
           }
+          if (id.includes('node_modules/three')) {
+            return 'three';
+          }
           if (id.includes('node_modules/qrcode')) {
             return 'qrcode';
           }
           if (
             id.includes('/src/engines/') &&
             !id.includes('vietQr') &&
+            !id.includes('maritimePort3dEngine') &&
             !id.includes('__tests__')
           ) {
             return 'engines';
